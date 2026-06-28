@@ -1,0 +1,37 @@
+{
+  "version": "V25.1.1-bulk-odds-discovery",
+  "phase": "Phase 1.1 - API-Football bulk odds discovery and odds-first fixture selection",
+  "built_at_utc": "2026-06-28",
+  "source_of_truth": "Existing CSV/JSON and Telegram notification state",
+  "database_role": "Fail-open shadow mirror only",
+  "primary_goal": "Prevent MAX_MATCHES analysis slots from being consumed by fixtures without available bookmaker odds.",
+  "new_environment_variables": [
+    "ODDS_DISCOVERY_ENABLED",
+    "ODDS_DISCOVERY_BULK_ENABLED",
+    "ODDS_DISCOVERY_DAYS",
+    "ODDS_DISCOVERY_SCAN_LIMIT",
+    "ODDS_DISCOVERY_MAX_PAGES",
+    "ODDS_DISCOVERY_MAX_REQUESTS"
+  ],
+  "changed_files": [
+    "football_agent/data/odds.py",
+    "football_agent/data/api_football.py",
+    "football_agent/data/fixtures.py",
+    "football_agent/scripts/run_daily.py",
+    "football_agent/database/models.py",
+    "football_agent/database/shadow_writer.py",
+    "football_agent/storage/model_versions.py",
+    ".env.example"
+  ],
+  "new_files": [
+    "tests/test_v25_1_1_odds_discovery.py",
+    "AUDIT_V25_1_1_BULK_ODDS_DISCOVERY.md",
+    "SETUP_V25_1_1_BULK_ODDS_DISCOVERY.md"
+  ],
+  "validation": {
+    "unit_tests": 73,
+    "unit_test_status": "PASS",
+    "command": "python -m compileall football_agent -q && python smoke_test.py && python -m unittest discover -s tests"
+  },
+  "important_note": "Keep DATABASE_SHADOW_MODE=true and TELEGRAM_ENABLED=false during first live validation. V25.1.1 changes selection/order and odds telemetry only; it does not promote Supabase to source of truth."
+}

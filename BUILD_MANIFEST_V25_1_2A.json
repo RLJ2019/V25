@@ -1,0 +1,40 @@
+{
+  "version": "V25.1.2a-odds-snapshot-idempotency-hotfix",
+  "base_version": "V25.1.2-shadow-hardening-operational-efficiency",
+  "release_type": "hotfix",
+  "changes": [
+    "Normalize odds snapshot timestamps to UTC minute precision for snapshot_key generation.",
+    "Keep raw provider timestamp in snapshot_timestamp_utc for auditability.",
+    "Deduplicate duplicate odds snapshot keys before Supabase upsert.",
+    "Preserve true odds moves as unique snapshots because odds remain part of the hash.",
+    "Add V25.1.2a unit tests for timestamp normalization, key identity, and repository deduplication."
+  ],
+  "intentionally_unchanged": [
+    "MODEL_VERSION",
+    "CONFIG_VERSION",
+    "FEATURE_SET_VERSION",
+    "CALIBRATION_VERSION",
+    "pick identity",
+    "staking logic",
+    "line-up monitor logic",
+    "odds discovery logic"
+  ],
+  "new_environment_variables": [],
+  "test_result": "python -m compileall football_agent -q + python smoke_test.py + python -m unittest discover -s tests + healthcheck + daily run + lineup monitor + compare_shadow => OK; 82 unit tests passed",
+  "modified_files": [
+    "football_agent/database/repository.py",
+    "tests/test_v25_1_2a_odds_snapshot_idempotency.py",
+    "AUDIT_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md",
+    "SETUP_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md",
+    "README.md",
+    "CHATGPT_VALIDATION_V25_1_2A.md"
+  ],
+  "sha256": {
+    "football_agent/database/repository.py": "b44b3ed653d586a089dbd6c4485488deaf3600a5cd4585135d735f15d65ea35c",
+    "tests/test_v25_1_2a_odds_snapshot_idempotency.py": "af34e82b6cda4684c7c9b96808a6bd89c5b5bd0ab7a95053ba5831db5ea57294",
+    "AUDIT_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md": "a6bbf8d241ced8d3b8536daeb24de9a3ff87c2e5df455ead6b116055884917d6",
+    "SETUP_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md": "07a11b1584fec308af849b633d38cb87579037e463c0277ac4b90964f731f8fb",
+    "README.md": "e27d26da396d3964562d9c0a5066a19156b0177518b5c7ed572b0bd9d376521d",
+    "CHATGPT_VALIDATION_V25_1_2A.md": "ac59f6dc1cee0b44d176291ec1b7680f58b4fad65c90e431e0c9df8fac58c0b2"
+  }
+}
