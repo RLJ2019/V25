@@ -2,7 +2,7 @@ name: V25 Line-up Monitor
 
 on:
   schedule:
-    - cron: "*/15 9-23 * * *"
+    - cron: "*/30 9-23 * * *"
   workflow_dispatch:
 
 concurrency:
