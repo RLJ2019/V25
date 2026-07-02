@@ -1,0 +1,220 @@
+name: Daily V25 Multi-League Agent
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "run mode: daily, healthcheck, backtest, train_weights, database_healthcheck, compare_shadow"
+        required: false
+        default: "daily"
+
+      fixture_test_mode:
+        description: "use historical/test fixtures: true or false"
+        required: false
+        default: "false"
+
+      fixture_date_from:
+        description: "historical start date, for example 2024-01-01"
+        required: false
+        default: ""
+
+      fixture_date_to:
+        description: "historical end date, for example 2024-12-31"
+        required: false
+        default: ""
+
+      fixture_season:
+        description: "fixture season, for example 2024"
+        required: false
+        default: ""
+
+      fixture_source:
+        description: "fixture source: auto, football-data, api-football"
+        required: false
+        default: "auto"
+
+concurrency:
+  group: v25-football-agent-state
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+
+      TELEGRAM_ENABLED: ${{ vars.TELEGRAM_ENABLED || 'false' }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      DATABASE_ENABLED: ${{ vars.DATABASE_ENABLED || 'false' }}
+      DATABASE_SHADOW_MODE: ${{ vars.DATABASE_SHADOW_MODE || 'true' }}
+      DATABASE_FAIL_OPEN: ${{ vars.DATABASE_FAIL_OPEN || 'true' }}
+      DATABASE_BACKEND: "supabase_rest"
+      DATABASE_TIMEOUT_SECONDS: ${{ vars.DATABASE_TIMEOUT_SECONDS || '20' }}
+      DATABASE_MAX_RETRIES: ${{ vars.DATABASE_MAX_RETRIES || '2' }}
+      DATABASE_BATCH_SIZE: ${{ vars.DATABASE_BATCH_SIZE || '250' }}
+      SHADOW_COMPARE_SINCE_UTC: ${{ vars.SHADOW_COMPARE_SINCE_UTC || '' }}
+      SHADOW_COMPARE_FAIL_CLOSED: ${{ vars.SHADOW_COMPARE_FAIL_CLOSED || 'true' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+      AGENT_RUN_TYPE: "daily"
+      LOCAL_OUTPUT_DIR: "output"
+      DAYS_AHEAD: ${{ vars.DAYS_AHEAD || '7' }}
+      MAX_MATCHES: ${{ vars.MAX_MATCHES || '80' }}
+      ODDS_DISCOVERY_ENABLED: ${{ vars.ODDS_DISCOVERY_ENABLED || 'true' }}
+      ODDS_DISCOVERY_BULK_ENABLED: ${{ vars.ODDS_DISCOVERY_BULK_ENABLED || 'true' }}
+      ODDS_DISCOVERY_DAYS: ${{ vars.ODDS_DISCOVERY_DAYS || '14' }}
+      ODDS_DISCOVERY_SCAN_LIMIT: ${{ vars.ODDS_DISCOVERY_SCAN_LIMIT || '250' }}
+      ODDS_DISCOVERY_MAX_PAGES: ${{ vars.ODDS_DISCOVERY_MAX_PAGES || '5' }}
+      ODDS_DISCOVERY_MAX_REQUESTS: ${{ vars.ODDS_DISCOVERY_MAX_REQUESTS || '80' }}
+
+      FIXTURE_TEST_MODE: ${{ github.event.inputs.fixture_test_mode || vars.FIXTURE_TEST_MODE || 'false' }}
+      FIXTURE_DATE_FROM: ${{ github.event.inputs.fixture_date_from || vars.FIXTURE_DATE_FROM || '' }}
+      FIXTURE_DATE_TO: ${{ github.event.inputs.fixture_date_to || vars.FIXTURE_DATE_TO || '' }}
+      FIXTURE_SEASON: ${{ github.event.inputs.fixture_season || vars.FIXTURE_SEASON || '' }}
+      FIXTURE_SOURCE: ${{ github.event.inputs.fixture_source || vars.FIXTURE_SOURCE || 'auto' }}
+
+      MIN_DATA_QUALITY: "7.0"
+      MIN_CONFIDENCE: "7.0"
+      MIN_EDGE: "0.04"
+      REQUIRE_ODDS_FOR_VALUE_PICK: "true"
+      MAX_ODDS_AGE_MINUTES: "180"
+      REQUIRE_FINAL_LINEUP_FOR_VALUE_PICK: "true"
+
+      MAX_VALUE_PICKS_PER_COMPETITION: "3"
+      MAX_VALUE_PICKS_PER_TEAM: "1"
+      MAX_VALUE_PICKS_PER_FIXTURE: "1"
+      MAX_TOTAL_UNITS_PER_DAY: "3.0"
+      KELLY_FRACTION: "0.25"
+      BANKROLL_UNITS: "100"
+      MAX_UNITS_PER_PICK: "2.0"
+      MIN_UNITS_FOR_VALUE_PICK: "0.25"
+
+      SEND_DAILY_REPORT: "true"
+      SEND_VALUE_ALERTS: "true"
+      SEND_HEARTBEAT: "true"
+      HEARTBEAT_MIN_HOUR_UTC: "17"
+
+      LIVE_SHEET_URL: ${{ vars.LIVE_SHEET_URL || '' }}
+      GOOGLE_SHEET_WEBHOOK_URL: ${{ secrets.GOOGLE_SHEET_WEBHOOK_URL }}
+
+      INTERNATIONAL_BREAK_DAYS_AFTER: "7"
+      INTERNATIONAL_BREAK_WINDOWS: ${{ vars.INTERNATIONAL_BREAK_WINDOWS || '' }}
+
+      ONLY_LINEUP_WINDOW: "false"
+      ONLY_WATCHLIST_LINEUP_MONITOR: "false"
+      LINEUP_WINDOW_START_MINUTES: "65"
+      LINEUP_WINDOW_END_MINUTES: "45"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore output cache
+        uses: actions/cache@v4
+        with:
+          path: output/
+          key: v25-output-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            v25-output-${{ runner.os }}-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          DATABASE_ENABLED: "false"
+          SUPABASE_URL: ""
+          SUPABASE_SECRET_KEY: ""
+        run: |
+          python -m compileall football_agent -q
+          python smoke_test.py
+          python -m unittest discover -s tests
+
+      - name: Show live configuration
+        shell: bash
+        run: |
+          echo "MODE=${{ github.event.inputs.mode || 'daily' }}"
+          echo "FIXTURE_TEST_MODE=$FIXTURE_TEST_MODE"
+          echo "FIXTURE_SOURCE=$FIXTURE_SOURCE"
+          echo "FIXTURE_DATE_FROM=$FIXTURE_DATE_FROM"
+          echo "FIXTURE_DATE_TO=$FIXTURE_DATE_TO"
+          echo "FIXTURE_SEASON=$FIXTURE_SEASON"
+          echo "DAYS_AHEAD=$DAYS_AHEAD"
+          echo "MAX_MATCHES=$MAX_MATCHES"
+          echo "ODDS_DISCOVERY_ENABLED=$ODDS_DISCOVERY_ENABLED"
+          echo "ODDS_DISCOVERY_BULK_ENABLED=$ODDS_DISCOVERY_BULK_ENABLED"
+          echo "ODDS_DISCOVERY_DAYS=$ODDS_DISCOVERY_DAYS"
+          echo "ODDS_DISCOVERY_SCAN_LIMIT=$ODDS_DISCOVERY_SCAN_LIMIT"
+          echo "ODDS_DISCOVERY_MAX_PAGES=$ODDS_DISCOVERY_MAX_PAGES"
+          echo "ODDS_DISCOVERY_MAX_REQUESTS=$ODDS_DISCOVERY_MAX_REQUESTS"
+          echo "TELEGRAM_ENABLED=$TELEGRAM_ENABLED"
+          echo "DATABASE_ENABLED=$DATABASE_ENABLED"
+          echo "DATABASE_SHADOW_MODE=$DATABASE_SHADOW_MODE"
+          echo "DATABASE_FAIL_OPEN=$DATABASE_FAIL_OPEN"
+
+          if [[ -n "$SUPABASE_URL" && -n "$SUPABASE_SECRET_KEY" ]]; then
+            echo "DATABASE_CONFIGURED=true"
+          else
+            echo "DATABASE_CONFIGURED=false"
+          fi
+
+      - name: Run Daily Agent
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.mode == 'daily' || github.event.inputs.mode == '' }}
+        run: |
+          python run_agent.py
+
+      - name: Healthcheck
+        if: ${{ github.event.inputs.mode == 'healthcheck' }}
+        run: |
+          python -m football_agent.scripts.healthcheck
+
+      - name: Database healthcheck
+        if: ${{ github.event.inputs.mode == 'database_healthcheck' }}
+        run: |
+          python -m football_agent.scripts.run_database_healthcheck
+
+      - name: Compare shadow state
+        if: ${{ github.event.inputs.mode == 'compare_shadow' }}
+        run: |
+          python -m football_agent.scripts.compare_shadow_state
+
+      - name: Backtest
+        if: ${{ github.event.inputs.mode == 'backtest' }}
+        run: |
+          python -m football_agent.scripts.run_backtest
+
+      - name: Train model weights
+        if: ${{ github.event.inputs.mode == 'train_weights' }}
+        run: |
+          python -m football_agent.scripts.run_weight_training
+
+      - name: Upload output artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v25-daily-agent-output
+          path: output/
+          if-no-files-found: ignore
+          retention-days: 14
