@@ -1,0 +1,6 @@
+{
+  "version": "v25.0.4-default-untrained",
+  "note": "Offline training may overwrite these bounded multipliers after enough historical data is available.",
+  "global": {},
+  "competitions": {}
+}
