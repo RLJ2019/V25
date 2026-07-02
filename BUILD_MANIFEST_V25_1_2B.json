@@ -1,0 +1,718 @@
+{
+  "version": "V25.1.2b-test-isolation-normalization",
+  "created_by": "ChatGPT",
+  "purpose": "Isolate CI unit tests from Supabase and normalize NO_BET null-vs-zero probability comparison.",
+  "file_count": 140,
+  "files": [
+    {
+      "path": ".env.example",
+      "bytes": 829,
+      "sha256": "bebc93c53f2b811ba85762aeee12dd52c22c7d85939d273c22540804616eefd7"
+    },
+    {
+      "path": ".github/workflows/daily-v25-agent-fixed.yml",
+      "bytes": 7901,
+      "sha256": "67e7ff0198317b3190a426d3ffd4e71f202400f3cb8c17391d5a4e745ebd703c"
+    },
+    {
+      "path": ".github/workflows/heartbeat-v25.yml",
+      "bytes": 2671,
+      "sha256": "49de6918956e4cd927e668b81f1e2f031952792a892a191a8de44f2a21c61afd"
+    },
+    {
+      "path": ".github/workflows/lineup-v25-monitor.yml",
+      "bytes": 2793,
+      "sha256": "b1068a750f4c7cf12bdde7921cd1c53738ae5e29ce4b487adfbc9578f75c282e"
+    },
+    {
+      "path": ".github/workflows/weekly-v25-recalibration.yml",
+      "bytes": 2667,
+      "sha256": "a600369e75de7cc3c542d0143f2b54ee0d67a37313f546c6572edd14ab799183"
+    },
+    {
+      "path": "AUDIT_SUMMARY.txt",
+      "bytes": 919,
+      "sha256": "f3d43879654faf88ec686dd184998f3124fb2332ac108781544be5db44948a80"
+    },
+    {
+      "path": "AUDIT_V25.md",
+      "bytes": 5954,
+      "sha256": "03e5cbb61cd59855d2d5f453b10dacc88cf1f0a6603762249607713bf445f189"
+    },
+    {
+      "path": "AUDIT_V25_0_1_GEMINI_FIX.md",
+      "bytes": 3070,
+      "sha256": "65a7ef9113a4004b62741b458d822ab56913d284f06b608aaa447890dfc03728"
+    },
+    {
+      "path": "AUDIT_V25_0_2_PROFESSIONAL_MATH_UPGRADE.md",
+      "bytes": 4077,
+      "sha256": "f5ce5a6f34b39ae7f1bfc821ac7ba5ae5d44e98cc17e8f23d7545fda476bce0a"
+    },
+    {
+      "path": "AUDIT_V25_0_3_BACKTEST_DATA_INTEGRITY.md",
+      "bytes": 4675,
+      "sha256": "2ab82293487a52fa2176be107a43c1659898254f16501d157d6c54968371494f"
+    },
+    {
+      "path": "AUDIT_V25_0_4_OPTIMIZATION_ACCURACY.md",
+      "bytes": 3089,
+      "sha256": "363e1a5dfe04a590aefcca4ecff281d9095d53e52f58b3e8924abf5a192ed978"
+    },
+    {
+      "path": "AUDIT_V25_0_5_RISK_XG90_RECALIBRATION.md",
+      "bytes": 5061,
+      "sha256": "552b4704cbedbff61dfbc130dbac47dabe5e1c83a62693848ead69448c032f6c"
+    },
+    {
+      "path": "AUDIT_V25_0_6_PROMOTED_THRESHOLDS_GAMESTATE.md",
+      "bytes": 2756,
+      "sha256": "49b2a316f7a4242b67658da1924dff851328926b81f316be93071ec4271fc2b3"
+    },
+    {
+      "path": "AUDIT_V25_0_7_PREMIUM_TELEGRAM_OPS.md",
+      "bytes": 3644,
+      "sha256": "42e67f3d61e36fef59d3853bc98ca4ea26691f532e6a6891cba111c34ee2e6b1"
+    },
+    {
+      "path": "AUDIT_V25_0_8_PREMIUM_STAKING_LINEUP_HYGIENE.md",
+      "bytes": 3490,
+      "sha256": "68fa96746f658b8f5a199341d4192152f1f11e4922af8ab6da67974f7d0a7f0c"
+    },
+    {
+      "path": "AUDIT_V25_0_9_PREMIUM_RELIABILITY_SHARP_MARKET.md",
+      "bytes": 4927,
+      "sha256": "ac258660232cca256bfa1fc07a28cab26215078bb8daa892521310343a7a316e"
+    },
+    {
+      "path": "AUDIT_V25_1_0_SHADOW_DATABASE_INFRASTRUCTURE.md",
+      "bytes": 2372,
+      "sha256": "f9a288d6ed033817ccbc4868264afd9015bb910953bf664947b484cf855c87dd"
+    },
+    {
+      "path": "AUDIT_V25_1_1_BULK_ODDS_DISCOVERY.md",
+      "bytes": 4413,
+      "sha256": "9fa322cc893e02999b0835af98699fdd4ce56e5bef1e9c261f8ba29804409168"
+    },
+    {
+      "path": "AUDIT_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md",
+      "bytes": 3286,
+      "sha256": "a6bbf8d241ced8d3b8536daeb24de9a3ff87c2e5df455ead6b116055884917d6"
+    },
+    {
+      "path": "AUDIT_V25_1_2B_TEST_ISOLATION_NORMALIZATION.md",
+      "bytes": 1861,
+      "sha256": "7ef6a739cc26206a81eca9840f6e666d7416575104eeb62328afaea77e060c67"
+    },
+    {
+      "path": "AUDIT_V25_1_2_SHADOW_HARDENING_OPERATIONAL_EFFICIENCY.md",
+      "bytes": 2986,
+      "sha256": "cd7063237d261992437a645ac8b13343c4e78391ba3ff297ee2b3fd78b6f8060"
+    },
+    {
+      "path": "BUILD_MANIFEST_V25_1_0.json",
+      "bytes": 1161,
+      "sha256": "b16afaf5c1568336ab73a42468d0f6132f1968b6b8661bafc43d8c72e6934ad9"
+    },
+    {
+      "path": "BUILD_MANIFEST_V25_1_1.json",
+      "bytes": 1556,
+      "sha256": "b34a54f637e0c26c3b0bac2ad475f2ef9eecacd7a14766e2d805958a7f39e597"
+    },
+    {
+      "path": "BUILD_MANIFEST_V25_1_2.json",
+      "bytes": 3398,
+      "sha256": "398911d576bf9dd41bf79cf0984f7139c4058a12ac60eebb83b23b205230b8c8"
+    },
+    {
+      "path": "BUILD_MANIFEST_V25_1_2A.json",
+      "bytes": 2060,
+      "sha256": "f681f22f03ef4576ccdaf88682a89ea1b7e38b8ad00f39dff1c84f695376c637"
+    },
+    {
+      "path": "BUILD_MANIFEST_V25_1_2B.json",
+      "bytes": 24183,
+      "sha256": "eb4b1efe0a1094ab032b291315be307a7871f8952d9158af851397c0bf48d54e"
+    },
+    {
+      "path": "CHATGPT_VALIDATION_V25_1_2.md",
+      "bytes": 1775,
+      "sha256": "191ba00c0bf47055c32ccf2e1ac0947e36d3ea3a5f4b6bd99ae767c20ef4fdb1"
+    },
+    {
+      "path": "CHATGPT_VALIDATION_V25_1_2A.md",
+      "bytes": 1799,
+      "sha256": "ac59f6dc1cee0b44d176291ec1b7680f58b4fad65c90e431e0c9df8fac58c0b2"
+    },
+    {
+      "path": "CHATGPT_VALIDATION_V25_1_2B.md",
+      "bytes": 1930,
+      "sha256": "e35b99468c34392822c8d3c96074cc46a6cf60feb74cb13320f3109bfcb84236"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6922,
+      "sha256": "e27d26da396d3964562d9c0a5066a19156b0177518b5c7ed572b0bd9d376521d"
+    },
+    {
+      "path": "SETUP_V25_1_0_SHADOW_DATABASE.md",
+      "bytes": 1977,
+      "sha256": "8f58c266e85a66431aa3efb3b886148aace3c4b35a9b2ca8a8dcd69aa26452c2"
+    },
+    {
+      "path": "SETUP_V25_1_1_BULK_ODDS_DISCOVERY.md",
+      "bytes": 1636,
+      "sha256": "0e1dbad18d843d0fff8edb760c9f31d39950f7a4413c5784c3ff1bf8716fad38"
+    },
+    {
+      "path": "SETUP_V25_1_2A_ODDS_SNAPSHOT_IDEMPOTENCY.md",
+      "bytes": 1833,
+      "sha256": "07a11b1584fec308af849b633d38cb87579037e463c0277ac4b90964f731f8fb"
+    },
+    {
+      "path": "SETUP_V25_1_2B_TEST_ISOLATION_NORMALIZATION.md",
+      "bytes": 747,
+      "sha256": "d65bda9239b995c9910809cd0ad04a5fdfe26b2a53837373163c3c4872bdbd66"
+    },
+    {
+      "path": "SETUP_V25_1_2_SHADOW_HARDENING_OPERATIONAL_EFFICIENCY.md",
+      "bytes": 1778,
+      "sha256": "e265e70fb5ee73244491778d9e50810c5d95320619b62c495d844646084b5a29"
+    },
+    {
+      "path": "SUPABASE_CLEAN_SHADOW_TABLES_V25_1_2B.sql",
+      "bytes": 278,
+      "sha256": "791b9064aae4c949299a130bcd4457a81eb26a202b9454cc3de7bf27e9586017"
+    },
+    {
+      "path": "football_agent/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/config/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/config/bookmaker_profiles.yml",
+      "bytes": 416,
+      "sha256": "cf081287cab817a3e82d2ad1cff2dc867b70cf5841b68b7919231e95ea56647b"
+    },
+    {
+      "path": "football_agent/config/competitions.yml",
+      "bytes": 3284,
+      "sha256": "37b7dc04a7ba6b3e847b5332694764fb78d3c71ec9180716980daf2689d65922"
+    },
+    {
+      "path": "football_agent/config/learned_model_weights.json",
+      "bytes": 196,
+      "sha256": "0b5fb6e83b088526a536ffbbb3c7d27802832b6a2286ca908866dd7fa4b53f60"
+    },
+    {
+      "path": "football_agent/config/loader.py",
+      "bytes": 797,
+      "sha256": "64f519083e91430e085de52a752acf2f9cacae7b3a58a3ec3cf9fa52b422911b"
+    },
+    {
+      "path": "football_agent/config/model_settings.yml",
+      "bytes": 598,
+      "sha256": "5f03001ab87b7e29bb0be3e2a4fd4eefbf671231ea1ec74efe64ebfd1229100a"
+    },
+    {
+      "path": "football_agent/data/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/data/api_football.py",
+      "bytes": 9577,
+      "sha256": "8b2516e3c36cc4b634c6e197a50ff8d3930a73166f0df36e0120bc104130001a"
+    },
+    {
+      "path": "football_agent/data/fixtures.py",
+      "bytes": 5566,
+      "sha256": "0076c71f5c65daa63c7edde15470e894c87da6f8c330451308ca483a52287cbc"
+    },
+    {
+      "path": "football_agent/data/football_data.py",
+      "bytes": 3693,
+      "sha256": "2ab23e56abb9a9a497cfe7ebf3fd2392487af496481710a3c2a93f2ac51e978b"
+    },
+    {
+      "path": "football_agent/data/http.py",
+      "bytes": 1141,
+      "sha256": "ccdf3b70172b82946c2d9e55269033e7d0aabde7af6fa98c2310f543c20cb9c1"
+    },
+    {
+      "path": "football_agent/data/odds.py",
+      "bytes": 12575,
+      "sha256": "b3179cf4f19d8babce04a6867e94ad1075f4b05eb3ecd8c1053207ba2e02ff6b"
+    },
+    {
+      "path": "football_agent/database/__init__.py",
+      "bytes": 558,
+      "sha256": "cc37afadbf65b4f25974674ce9d75d4c9903769c1c3e0f5ff883916ad8173fd2"
+    },
+    {
+      "path": "football_agent/database/connection.py",
+      "bytes": 8174,
+      "sha256": "3687d06b529ed49a2f0cef62cc7dc3de0bccffbe7a9224afe5a72a92c269b3da"
+    },
+    {
+      "path": "football_agent/database/migrations/001_initial_schema.sql",
+      "bytes": 5810,
+      "sha256": "34dd7face8e1fe2a1a7ad142e0cadd63491b7e3a9debaced9dfb89e7868f80d7"
+    },
+    {
+      "path": "football_agent/database/models.py",
+      "bytes": 816,
+      "sha256": "2304e32fd0878a5101036b3333ac4fcd548c975a4fe5e382c2fc2b73bfb82156"
+    },
+    {
+      "path": "football_agent/database/repository.py",
+      "bytes": 12647,
+      "sha256": "b44b3ed653d586a089dbd6c4485488deaf3600a5cd4585135d735f15d65ea35c"
+    },
+    {
+      "path": "football_agent/database/shadow_writer.py",
+      "bytes": 7783,
+      "sha256": "1017c0b2851a04c06ee5f34516763c491cbc6ef898a76132134fb285c505dac5"
+    },
+    {
+      "path": "football_agent/decision/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/decision/exposure_manager.py",
+      "bytes": 2885,
+      "sha256": "d41ba872817a4d76f55e1ff81337a15ec0f552b7b14d1b7ed6aeac46a3f2bb25"
+    },
+    {
+      "path": "football_agent/decision/no_bet_rules.py",
+      "bytes": 3500,
+      "sha256": "961bc59619dcaff575e112052161b050b4ba11ee28f6bbefba21451124d5b29a"
+    },
+    {
+      "path": "football_agent/decision/pick_selector.py",
+      "bytes": 5847,
+      "sha256": "bf6109e90bb405f1e641c0b5e17b219724ecc29bc3b335096321720a65d4f274"
+    },
+    {
+      "path": "football_agent/decision/risk_filter.py",
+      "bytes": 253,
+      "sha256": "84736cdffc005462b3ec4d82402d4ddb1512e98d1052f48bd0a0e8d1f3baf935"
+    },
+    {
+      "path": "football_agent/decision/staking.py",
+      "bytes": 4952,
+      "sha256": "bafaa894e744220758521c4ec2d9987c4667c764bf42e427201f616800a02af8"
+    },
+    {
+      "path": "football_agent/evaluation/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/evaluation/brier.py",
+      "bytes": 249,
+      "sha256": "733866a34bb8bcbe6c662910b144f34b97559c3f72f63e9666fa6f9b59e16d5e"
+    },
+    {
+      "path": "football_agent/evaluation/calibration_buckets.py",
+      "bytes": 788,
+      "sha256": "1fd704cae7c30a7cbd4a884a04a181e3301977458a8f51142b709fd31b7fec4b"
+    },
+    {
+      "path": "football_agent/evaluation/closing_line_value.py",
+      "bytes": 209,
+      "sha256": "ec817fe93a323fcb9f701e7b5467f3fb411625bfaa3225bf7f59bc0a1ba2bcb4"
+    },
+    {
+      "path": "football_agent/evaluation/league_performance.py",
+      "bytes": 828,
+      "sha256": "772f899ad0cf4569e0f2f45470823efe931d8559941f30a99855b1a58659cea7"
+    },
+    {
+      "path": "football_agent/evaluation/log_loss.py",
+      "bytes": 252,
+      "sha256": "eeb6493360501ed9cfc0b6c5a55efe3ae907e252960533018fa9a0b6cce25550"
+    },
+    {
+      "path": "football_agent/evaluation/roi.py",
+      "bytes": 464,
+      "sha256": "da2b8b4fe414fe64748a89f1e84dab4c5f4515581a856e26e2cf6d3a19deb7f6"
+    },
+    {
+      "path": "football_agent/models/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/models/calendar_context.py",
+      "bytes": 2292,
+      "sha256": "5d89f947c93fe94ab96380c32313fbee8d1022131286cfcb51a5185a538b5ec9"
+    },
+    {
+      "path": "football_agent/models/calibration.py",
+      "bytes": 6161,
+      "sha256": "b0f50914a96f9459e10bc1d77300d5da509fdc6eb2b5ee6d9d4b35b9f7878bcd"
+    },
+    {
+      "path": "football_agent/models/elo_model.py",
+      "bytes": 2966,
+      "sha256": "25d3b02445c2e20c2b9aee83617b99b81de7dbd0d397fbd4981b6c97a52e3281"
+    },
+    {
+      "path": "football_agent/models/ensemble.py",
+      "bytes": 16206,
+      "sha256": "3c534f0bbd0d96f8df405820ae82926215b3fa61d0de491c64c4d9c7839f0ca8"
+    },
+    {
+      "path": "football_agent/models/fatigue_model.py",
+      "bytes": 1081,
+      "sha256": "2233ab09f02c3e9bf1e8a6dfe389c221e09d7a65f952bf28250a65a3a0cc87a1"
+    },
+    {
+      "path": "football_agent/models/injury_model.py",
+      "bytes": 3661,
+      "sha256": "e006e1fafbdf41571b3163dc16893570daf85f23d151703225fa5f7904b0011a"
+    },
+    {
+      "path": "football_agent/models/market_attributors.py",
+      "bytes": 5828,
+      "sha256": "196597b77a64fc8749c4774134b425631c7035a57bc0006de9f7bd64655cd1cd"
+    },
+    {
+      "path": "football_agent/models/market_model.py",
+      "bytes": 2489,
+      "sha256": "94551ecafa501f606b070d0745cde7e275533b8332322736315452565886983a"
+    },
+    {
+      "path": "football_agent/models/motivation_model.py",
+      "bytes": 4756,
+      "sha256": "d05c7c9eb02c64b0a89eea4371f57f8b5b97dcc1e12a2a65266b46a27a6affb6"
+    },
+    {
+      "path": "football_agent/models/poisson_model.py",
+      "bytes": 3563,
+      "sha256": "ad5f0f880f44a03eace77e03de24b3163bb920a9ec9b7dfab58ef87f9aacf7fe"
+    },
+    {
+      "path": "football_agent/models/referee_model.py",
+      "bytes": 528,
+      "sha256": "46e019c62f5b1ce8952abf812578d7553b18bddf7175d6ef297b4547f377b21f"
+    },
+    {
+      "path": "football_agent/models/uncertainty_model.py",
+      "bytes": 6384,
+      "sha256": "e805359eafc925a1b37bc7fa052d47925aca4a3f478dfe669e8f630ec901cb5d"
+    },
+    {
+      "path": "football_agent/models/value_engine.py",
+      "bytes": 7149,
+      "sha256": "d9b107c47e23576e9bc90386be7004c6d574ae316375daf11e1399a4289c9e1b"
+    },
+    {
+      "path": "football_agent/models/weighting.py",
+      "bytes": 2091,
+      "sha256": "31975554e7ef68e986f25bc57f1153c9e201429542ac4fbe6c2d95f773e38fc8"
+    },
+    {
+      "path": "football_agent/models/xg_model.py",
+      "bytes": 5416,
+      "sha256": "19a55af825adaa286eb525c1dbdf98375737ed85373ce1c5c4fb09725fb006f7"
+    },
+    {
+      "path": "football_agent/reports/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/reports/daily_summary.py",
+      "bytes": 411,
+      "sha256": "d08e0c820db345bbdd86766f754942184c155dd1c6e64a6a85e316fb3c021f92"
+    },
+    {
+      "path": "football_agent/reports/gemini_explainer.py",
+      "bytes": 3232,
+      "sha256": "8ca6fdc0f7f9fb90ece3beecf95fad53561dbef0ca0178531f6c52f44932559e"
+    },
+    {
+      "path": "football_agent/reports/live_sheet_export.py",
+      "bytes": 5138,
+      "sha256": "2216aa676234b092df1e672fe2ee45397719e2edc0c52e411fdbf2e827187b66"
+    },
+    {
+      "path": "football_agent/reports/telegram.py",
+      "bytes": 7230,
+      "sha256": "f5ebebe905d1b3070c188e91c16a2e8adf6a2d5fa80974ffe0ed3d07e2801c85"
+    },
+    {
+      "path": "football_agent/reports/weekly_evaluation.py",
+      "bytes": 397,
+      "sha256": "04744870ce6533d539a04685c65fab38a30342aa66ce20896b8955c3e21e1afa"
+    },
+    {
+      "path": "football_agent/schemas.py",
+      "bytes": 6072,
+      "sha256": "805fe4779c63698c28b1c73e0c8e38db7384e02e8569f4c188794a4000e11f06"
+    },
+    {
+      "path": "football_agent/scripts/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/scripts/compare_shadow_state.py",
+      "bytes": 11700,
+      "sha256": "832ab98956ddc0fbdc82885181548a69a3b08b11f354b64dee1459c384f8ab1b"
+    },
+    {
+      "path": "football_agent/scripts/healthcheck.py",
+      "bytes": 896,
+      "sha256": "7db6c914699b51e90b3cdc748812f42dcf29d6d5e60ff7b3dbab4ccadd4bc0b4"
+    },
+    {
+      "path": "football_agent/scripts/run_backtest.py",
+      "bytes": 6852,
+      "sha256": "3769559b722fff9ffa210531023f185c38651913fd179474f1f9938c33893a06"
+    },
+    {
+      "path": "football_agent/scripts/run_daily.py",
+      "bytes": 21326,
+      "sha256": "ea31f5755c23a350e43b542c20a0adfa540e882b21c459d4d1e119189ef10866"
+    },
+    {
+      "path": "football_agent/scripts/run_database_healthcheck.py",
+      "bytes": 972,
+      "sha256": "659c10e2533c97550f528e38498186b812b72b1d3abed27e6026ea14ead4ec00"
+    },
+    {
+      "path": "football_agent/scripts/run_heartbeat.py",
+      "bytes": 740,
+      "sha256": "4469ef461f09da550eb42e87955d64bce1124c630443626206ee8b757e15b2ef"
+    },
+    {
+      "path": "football_agent/scripts/run_lineup_monitor.py",
+      "bytes": 977,
+      "sha256": "ff96ac311fac1e1214c968809cb5a566f6e45d329423d9b52db4de2eb3672054"
+    },
+    {
+      "path": "football_agent/scripts/run_weight_training.py",
+      "bytes": 6695,
+      "sha256": "ff9208c6cae70bd26e4e18e4f57b9046a814ca6808d0467359cb5dacb3b7a7d5"
+    },
+    {
+      "path": "football_agent/storage/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "football_agent/storage/data_snapshots.py",
+      "bytes": 4532,
+      "sha256": "3ce0e091726d53c35d20344cd3de1c3660067a6080ed81ab122d26662ff581ed"
+    },
+    {
+      "path": "football_agent/storage/model_versions.py",
+      "bytes": 203,
+      "sha256": "01d05c4a1213a4314356a87e9913ec2460e1a3dd3392a2bfe7d260e70df4550b"
+    },
+    {
+      "path": "football_agent/storage/notification_state.py",
+      "bytes": 5695,
+      "sha256": "9f0975c7aec9a0022d64a314e3b5966efb2a94ed53c5ea972fd78b72c5112ee5"
+    },
+    {
+      "path": "football_agent/storage/odds_snapshots.py",
+      "bytes": 1488,
+      "sha256": "96d2073e722295152769c656bc96e0dd5dee1c19f5f33808b13ffd5a4ed6bf78"
+    },
+    {
+      "path": "football_agent/storage/odds_timeline.py",
+      "bytes": 2732,
+      "sha256": "2b41c498173155ce6ef30db15c2af6f015c6625669fee26c1a20fcaf13af7571"
+    },
+    {
+      "path": "football_agent/storage/prediction_log.py",
+      "bytes": 5693,
+      "sha256": "278c0de31d3e1c63eb9bcbc3e80347b2c14f4fe98b516cb6293e5b3b5af50b19"
+    },
+    {
+      "path": "football_agent/utils.py",
+      "bytes": 1115,
+      "sha256": "a8364f236a29ad596d78baf81242c7468ea130dceffb0968d730eccfcfcaa4ca"
+    },
+    {
+      "path": "football_agent/utils_time.py",
+      "bytes": 1157,
+      "sha256": "ff67304036a55fba1e491258eda3d442e467e04f687a52eff280fb55d617b83f"
+    },
+    {
+      "path": "output/daily_summary.txt",
+      "bytes": 61,
+      "sha256": "4e6f3df449b14f8e645b94a1bd1b46a4efeb5adfba5ad20531b3b8d155e88529"
+    },
+    {
+      "path": "output/live_picks_sheet.csv",
+      "bytes": 290,
+      "sha256": "719fc215cf5e8e2d924649012bc184017233be7de8223ec9bfb0b03cb23024b7"
+    },
+    {
+      "path": "output/notification_state.json",
+      "bytes": 112,
+      "sha256": "89dbcbe2a5b7146ce036d147988f283e48270588576c45d8c8fa782bc6c2bf87"
+    },
+    {
+      "path": "output/prediction_log.csv",
+      "bytes": 735,
+      "sha256": "80188a3ce30d30df7a8ea23717623506ac2b81e45bfbed8e60fd702b6eee5d21"
+    },
+    {
+      "path": "output/shadow_database_report.json",
+      "bytes": 482,
+      "sha256": "adbfbbf95eadadc6c9a3fe0f2d14340026507d7300a3b4acba76ef7b196efa7d"
+    },
+    {
+      "path": "output/shadow_parity_report.json",
+      "bytes": 343,
+      "sha256": "e3492bd4b3657d1a5c26ea41e7a1e710dea853b0391388e617d6576740606165"
+    },
+    {
+      "path": "output/telegram_message_preview.html",
+      "bytes": 258,
+      "sha256": "5a34e0b4fe30b918de20d868cf4fe73acd98ca470d3e44fad9e345c46ad6bd57"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 58,
+      "sha256": "d2655a29190e61276846f83d0e5aef83042386ff7f531d2c8230348492eb5472"
+    },
+    {
+      "path": "run_agent.py",
+      "bytes": 89,
+      "sha256": "3daeb806493fb9e657f61c62c340fa0d25da0d75a0636b2072b60a363d17dbf5"
+    },
+    {
+      "path": "smoke_test.py",
+      "bytes": 1041,
+      "sha256": "f66b1626e9c0072f366717235b9baea89b66ba4772a9c59df2c715062d28563a"
+    },
+    {
+      "path": "tests/test_ensemble_guardrails.py",
+      "bytes": 2269,
+      "sha256": "a55549346562849ef2662bb6355fac0cd22aec8fcb0f094135915142cc707951"
+    },
+    {
+      "path": "tests/test_evaluation.py",
+      "bytes": 777,
+      "sha256": "6390504b95129e7e9e27d51de75bac46fca55f4026da844e1847d860a39a705f"
+    },
+    {
+      "path": "tests/test_fixture_test_mode.py",
+      "bytes": 3814,
+      "sha256": "abecfff1aa98f9259865a190de9475606420d1a38316f257b0a664b2fbc6e9e2"
+    },
+    {
+      "path": "tests/test_injury_model.py",
+      "bytes": 708,
+      "sha256": "4dac3e9b31cccd33553c311c52b13a51c994e1a877b87c34c51662a37065e50b"
+    },
+    {
+      "path": "tests/test_market_model.py",
+      "bytes": 598,
+      "sha256": "8995072cbbc85ada05a3725cfbab9962ce2dd992761b65134048c6cf90034993"
+    },
+    {
+      "path": "tests/test_pick_selector.py",
+      "bytes": 828,
+      "sha256": "7910cca04efca0ae9280e3fedcfb21a7a4053bba24dc6bf812fc7db16ea66577"
+    },
+    {
+      "path": "tests/test_poisson_model.py",
+      "bytes": 506,
+      "sha256": "8e19fb911ff87730910dcf4ef0901d9c4b74b3212fef4bf2234b2ac7270b51d1"
+    },
+    {
+      "path": "tests/test_v25_0_2_professional_math.py",
+      "bytes": 3531,
+      "sha256": "a649b117e878372128803b274665851127326c1b959141f9ae4e9ff3819d9749"
+    },
+    {
+      "path": "tests/test_v25_0_3_data_integrity.py",
+      "bytes": 6194,
+      "sha256": "62dd5d888c3a12010888795a4d269c7e83bc830d59e0e5aa85caadf044029a6f"
+    },
+    {
+      "path": "tests/test_v25_0_4_optimization.py",
+      "bytes": 5124,
+      "sha256": "9ddbba25cb2097383d797446440f8726348163692c107f9cdee7691776534b90"
+    },
+    {
+      "path": "tests/test_v25_0_5_risk_xg90_recalibration.py",
+      "bytes": 8256,
+      "sha256": "01495a73c5169d6b5ba1506f0097c10c096015d09b5f8b1e773eda683ce06990"
+    },
+    {
+      "path": "tests/test_v25_0_6_promoted_thresholds_gamestate.py",
+      "bytes": 3089,
+      "sha256": "7872a7ad6da34fd23761ee2bb7cfde26f2c94c233578e1d33e052d91b624267d"
+    },
+    {
+      "path": "tests/test_v25_0_7_premium_telegram_ops.py",
+      "bytes": 4067,
+      "sha256": "96c1d0d9090992e3d65c2cd4e27e2167e71735e69d7c7a5aabafd7e4e37f5dbe"
+    },
+    {
+      "path": "tests/test_v25_0_8_premium_staking_hygiene.py",
+      "bytes": 4480,
+      "sha256": "a31984764d0b1f8595ae07c03c9429ab53b709e2568203e4706136c70a61719f"
+    },
+    {
+      "path": "tests/test_v25_0_9_premium_reliability.py",
+      "bytes": 5924,
+      "sha256": "cbd428cfef18abe5d69b2872a307a37a248919b3f5cea67ed368147c2d415f23"
+    },
+    {
+      "path": "tests/test_v25_1_0_shadow_database.py",
+      "bytes": 11041,
+      "sha256": "9428d035e61ce3add332bceac6c7083b24b4dd9e9441dc103c0b8c63720370d2"
+    },
+    {
+      "path": "tests/test_v25_1_1_odds_discovery.py",
+      "bytes": 3378,
+      "sha256": "fab29d00edc981a3c6c72beeab084a205c7d3b0e4e6e079a0f01c7eb2668f70a"
+    },
+    {
+      "path": "tests/test_v25_1_2_shadow_hardening_efficiency.py",
+      "bytes": 5814,
+      "sha256": "3427ec342ebe457028bf367a76657a785a928ce3ffc645462c62e77839e611be"
+    },
+    {
+      "path": "tests/test_v25_1_2a_odds_snapshot_idempotency.py",
+      "bytes": 3738,
+      "sha256": "af34e82b6cda4684c7c9b96808a6bd89c5b5bd0ab7a95053ba5831db5ea57294"
+    },
+    {
+      "path": "tests/test_v25_1_2b_test_isolation_normalization.py",
+      "bytes": 3393,
+      "sha256": "0e0905bf86bd6f90b6ac5208503bb0ac403a47561e97b4e893638c2f8ab8b340"
+    },
+    {
+      "path": "tests/test_value_engine.py",
+      "bytes": 1612,
+      "sha256": "476a6e587c62febff0b703f5ee7d9d13b445c32ab026f0e8a7d2f56b175f8999"
+    }
+  ],
+  "validation": {
+    "compileall": "OK",
+    "smoke_test": "OK",
+    "unit_tests": "OK - 87 tests passed",
+    "healthcheck_without_secrets": "OK",
+    "daily_without_api_keys": "OK",
+    "lineup_monitor_without_api_keys": "OK",
+    "compare_shadow_database_disabled": "SKIPPED with critical_errors=0"
+  },
+  "manual_supabase_reset_sql": "SUPABASE_CLEAN_SHADOW_TABLES_V25_1_2B.sql"
+}
