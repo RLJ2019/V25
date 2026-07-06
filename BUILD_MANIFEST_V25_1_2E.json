@@ -1,0 +1,21 @@
+{
+  "version_label": "V25.1.2e-stale-nobet-notification-state-guard",
+  "base_model_version_preserved": "V25.1.2d-shadow-compare-zero-window-state-guard",
+  "scope": "compare-only hotfix",
+  "changed_files": [
+    "football_agent/scripts/compare_shadow_state.py",
+    "tests/test_v25_1_2e_stale_nobet_notification_state_guard.py",
+    "AUDIT_V25_1_2E_STALE_NOBET_NOTIFICATION_STATE_GUARD.md",
+    "SETUP_V25_1_2E_STALE_NOBET_NOTIFICATION_STATE_GUARD.md",
+    "BUILD_MANIFEST_V25_1_2E.json"
+  ],
+  "validation": [
+    "python -m compileall -q football_agent",
+    "python -m unittest discover -s tests",
+    "102 tests passed"
+  ],
+  "notes": [
+    "MODEL_VERSION intentionally unchanged to avoid pick identity drift.",
+    "No prediction, odds, staking, or database schema changes."
+  ]
+}
