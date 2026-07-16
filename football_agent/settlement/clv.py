@@ -96,7 +96,7 @@ def _filter_quotes_for_kickoff(
 
 def odds_quote_from_row(row: Mapping[str, Any]) -> Optional[OddsQuote]:
     odds = _dec(row.get("odds"))
-    if odds is None or odds <= 0:
+    if odds is None or odds <= Decimal("1"):
         return None
     market = str(row.get("market") or "")
     selection = str(row.get("selection") or "")
@@ -258,6 +258,9 @@ def calculate_clv(
     quote_objs: List[OddsQuote] = []
     for quote in quotes:
         if isinstance(quote, OddsQuote):
+            quote_odds = _dec(quote.odds)
+            if quote_odds is None or quote_odds <= Decimal("1"):
+                continue
             quote_objs.append(quote)
         else:
             parsed = odds_quote_from_row(quote)
