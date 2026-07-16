@@ -192,5 +192,120 @@ class V2513ClvHardeningTests(unittest.TestCase):
         )
 
 
+    def test_clv_rejects_invalid_complementary_odds_of_one(self):
+        result = calculate_clv(
+            entry_odds=Decimal("11.00"),
+            model_probability=Decimal("0.50"),
+            market="BTTS",
+            selection="BTTS_YES",
+            closing_bookmaker="marathonbet",
+            quotes=[
+                OddsQuote(
+                    "marathonbet",
+                    "BTTS",
+                    "BTTS_YES",
+                    Decimal("11.00"),
+                    "yes-valid",
+                    "2026-07-15T18:59:10Z",
+                ),
+                OddsQuote(
+                    "marathonbet",
+                    "BTTS",
+                    "BTTS_NO",
+                    Decimal("1.00"),
+                    "no-invalid",
+                    "2026-07-15T18:59:20Z",
+                ),
+            ],
+        )
+
+        self.assertEqual(result.clv_method, "IMPLIED_FALLBACK")
+        self.assertEqual(result.closing_odds, Decimal("11.00"))
+        self.assertIsNone(result.overround)
+        self.assertEqual(
+            result.closing_probability,
+            Decimal("1") / Decimal("11.00"),
+        )
+        self.assertEqual(
+            result.clv_warning,
+            "MISSING_COMPLEMENTARY_ODDS",
+        )
+
+    def test_clv_rejects_invalid_selected_odds_of_one(self):
+        result = calculate_clv(
+            entry_odds=Decimal("2.00"),
+            model_probability=Decimal("0.50"),
+            market="BTTS",
+            selection="BTTS_YES",
+            closing_bookmaker="marathonbet",
+            quotes=[
+                OddsQuote(
+                    "marathonbet",
+                    "BTTS",
+                    "BTTS_YES",
+                    Decimal("1.00"),
+                    "yes-invalid",
+                    "2026-07-15T18:59:10Z",
+                ),
+                OddsQuote(
+                    "marathonbet",
+                    "BTTS",
+                    "BTTS_NO",
+                    Decimal("2.00"),
+                    "no-valid",
+                    "2026-07-15T18:59:20Z",
+                ),
+            ],
+        )
+
+        self.assertEqual(result.clv_method, "MISSING_CLOSING_ODDS")
+        self.assertIsNone(result.closing_odds)
+        self.assertIsNone(result.closing_probability)
+        self.assertEqual(
+            result.clv_warning,
+            "NO_SELECTED_CLOSING_ODDS",
+        )
+
+
+    def test_clv_rejects_invalid_database_row_odds_of_one(self):
+        result = calculate_clv(
+            entry_odds=Decimal("11.00"),
+            model_probability=Decimal("0.50"),
+            market="BTTS",
+            selection="BTTS_YES",
+            closing_bookmaker="marathonbet",
+            quotes=[
+                {
+                    "bookmaker": "marathonbet",
+                    "market": "BTTS",
+                    "selection": "BTTS_YES",
+                    "odds": "11.00",
+                    "snapshot_key": "yes-valid-row",
+                    "snapshot_timestamp_utc": "2026-07-15T18:59:10Z",
+                },
+                {
+                    "bookmaker": "marathonbet",
+                    "market": "BTTS",
+                    "selection": "BTTS_NO",
+                    "odds": "1.00",
+                    "snapshot_key": "no-invalid-row",
+                    "snapshot_timestamp_utc": "2026-07-15T18:59:20Z",
+                },
+            ],
+        )
+
+        self.assertEqual(result.clv_method, "IMPLIED_FALLBACK")
+        self.assertEqual(result.closing_odds, Decimal("11.00"))
+        self.assertIsNone(result.overround)
+        self.assertEqual(
+            result.closing_probability,
+            Decimal("1") / Decimal("11.00"),
+        )
+        self.assertEqual(
+            result.clv_warning,
+            "MISSING_COMPLEMENTARY_ODDS",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
