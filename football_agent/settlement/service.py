@@ -29,6 +29,10 @@ class SettlementService:
         self.now_utc = now_utc or datetime.now(timezone.utc)
 
     def _input_from_pick(self, row: Mapping[str, Any], fixture_row: Optional[Mapping[str, Any]] = None) -> SettlementInput | SettlementOutcome:
+        pick_id = str(row.get("pick_id") or "")
+        if not pick_id:
+            return SettlementOutcome.skipped("SKIPPED_MISSING_PICK_ID")
+
         status = str(row.get("status") or "").upper()
         if status in SKIP_PICK_STATUSES or status not in VALUE_PICK_STATUSES:
             return SettlementOutcome.skipped("SKIPPED_NOT_VALUE_PICK", pick_status=status)
@@ -48,7 +52,7 @@ class SettlementService:
         except MarketMappingError as exc:
             return SettlementOutcome.skipped(exc.code, message=str(exc), market=market, selection=selection, line=row.get("line"))
         return SettlementInput(
-            pick_id=str(row.get("pick_id") or ""),
+            pick_id=pick_id,
             fixture_id=fixture_id,
             market=canonical_market,
             selection=canonical_selection,
@@ -113,7 +117,7 @@ class SettlementService:
             "closing_snapshot_id": clv.closing_snapshot_id,
             "overround": self._dec_to_float(clv.overround),
             "clv_odds": self._dec_to_float(clv.clv_market_movement),
-            "clv_probability": self._dec_to_float(clv.clv_model_vs_close),
+            "clv_probability": self._dec_to_float(clv.closing_probability),
             "clv_market_movement": self._dec_to_float(clv.clv_market_movement),
             "clv_model_vs_close": self._dec_to_float(clv.clv_model_vs_close),
             "clv_method": clv.clv_method,
@@ -155,6 +159,7 @@ class SettlementService:
                 market=pick.market,
                 selection=pick.selection,
                 line=pick.line,
+                kickoff_utc=pick.kickoff_utc or result.kickoff_utc or (fixture_row or {}).get("kickoff_utc"),
                 closing_bookmaker=pick.bookmaker,
                 quotes=odds_rows,
             )
