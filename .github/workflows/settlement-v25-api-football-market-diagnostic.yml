@@ -1,0 +1,163 @@
+name: V25.1.3 API-Football Market Diagnostic
+
+on:
+  push:
+    branches:
+      - dev/v25.1.3-settlement-pipeline
+    paths:
+      - .github/workflows/settlement-v25-api-football-market-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout settlement branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Confirm read-only API diagnostic
+        shell: bash
+        run: |
+          test -n "$API_FOOTBALL_KEY"
+          echo "API-Football read-only diagnostic confirmed."
+
+      - name: Read raw API-Football markets
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from football_agent.data.api_football import ApiFootballClient
+
+          fixture_id = 1554386
+          client = ApiFootballClient()
+
+          data = client._get("odds", {"fixture": fixture_id})
+
+          available_bookmakers = set()
+          marathon_markets = []
+
+          for response_item in data.get("response", []) or []:
+              fixture = response_item.get("fixture", {}) or {}
+              update = response_item.get("update")
+
+              for bookmaker in response_item.get("bookmakers", []) or []:
+                  bookmaker_id = bookmaker.get("id")
+                  bookmaker_name = str(bookmaker.get("name") or "")
+                  available_bookmakers.add(bookmaker_name)
+
+                  if "marathon" not in bookmaker_name.lower():
+                      continue
+
+                  for bet in bookmaker.get("bets", []) or []:
+                      bet_id = bet.get("id")
+                      bet_name = str(bet.get("name") or "")
+                      values = []
+
+                      for value in bet.get("values", []) or []:
+                          raw_label = str(value.get("value") or "")
+                          raw_odds = value.get("odd")
+
+                          parsed_market, parsed_selection = (
+                              client._parse_market_value(
+                                  bet_name,
+                                  raw_label,
+                              )
+                          )
+
+                          values.append(
+                              {
+                                  "raw_label": raw_label,
+                                  "raw_odds": raw_odds,
+                                  "parsed_market": parsed_market,
+                                  "parsed_selection": parsed_selection,
+                              }
+                          )
+
+                      marathon_markets.append(
+                          {
+                              "fixture_id": fixture.get("id"),
+                              "update": update,
+                              "bookmaker_id": bookmaker_id,
+                              "bookmaker_name": bookmaker_name,
+                              "bet_id": bet_id,
+                              "bet_name": bet_name,
+                              "values": values,
+                          }
+                      )
+
+          payload = {
+              "mode": "read_only_api_football_market_diagnostic",
+              "fixture_id": fixture_id,
+              "results": data.get("results"),
+              "response_count": len(data.get("response", []) or []),
+              "provider_errors": data.get("errors"),
+              "available_bookmakers": sorted(available_bookmakers),
+              "marathon_market_count": len(marathon_markets),
+              "marathon_markets": marathon_markets,
+          }
+
+          Path("output").mkdir(exist_ok=True)
+          output_path = Path(
+              "output/api_football_market_diagnostic.json"
+          )
+          output_path.write_text(
+              json.dumps(payload, indent=2, default=str),
+              encoding="utf-8",
+          )
+
+          print("===== DIAGNOSTIC SUMMARY =====")
+          print(f"fixture_id: {fixture_id}")
+          print(f"results: {payload['results']}")
+          print(f"response_count: {payload['response_count']}")
+          print(
+              "marathon_market_count: "
+              f"{payload['marathon_market_count']}"
+          )
+
+          print("\n===== MARATHONBET MARKETS =====")
+          for market in marathon_markets:
+              print(
+                  f"bet_id={market['bet_id']} "
+                  f"| bet_name={market['bet_name']}"
+              )
+              for value in market["values"]:
+                  print(
+                      "  "
+                      f"label={value['raw_label']} "
+                      f"| odds={value['raw_odds']} "
+                      f"| parsed_market={value['parsed_market']} "
+                      f"| parsed_selection={value['parsed_selection']}"
+                  )
+
+          print(f"\nArtifact written: {output_path}")
+          PY
+
+      - name: Upload diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v25-api-football-market-diagnostic
+          path: output/api_football_market_diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
