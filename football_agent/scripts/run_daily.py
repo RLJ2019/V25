@@ -301,15 +301,24 @@ def main() -> None:
         # The 1X2 market remains the anchor for the ensemble baseline; extra markets are
         # only used by the ValueEngine.
         value_market_probs = dict(market_probs or {})
-        for extra_market in ["OVER_UNDER_2_5", "BTTS"]:
+        extra_market_selections = {
+            "OVER_UNDER_2_5": {"OVER_2_5", "UNDER_2_5"},
+            "BTTS": {"BTTS_YES", "BTTS_NO"},
+        }
+        for extra_market, required_selections in extra_market_selections.items():
             sharp_extra = market_odds_matrix(odds, profile="sharp", market=extra_market)
             all_extra = market_odds_matrix(odds, market=extra_market)
-            has_sharp_extra = len(sharp_extra) >= 2
+            has_sharp_extra = set(sharp_extra) == required_selections
             matrix = sharp_extra if has_sharp_extra else all_extra
             baseline_source_by_market[extra_market] = "sharp" if has_sharp_extra else "all_bookmakers"
-            if len(matrix) >= 2:
+            if matrix:
                 try:
-                    value_market_probs.update(market.no_vig_probabilities(matrix))
+                    value_market_probs.update(
+                        market.no_vig_probabilities_for_selections(
+                            matrix,
+                            required_selections,
+                        )
+                    )
                 except Exception as exc:
                     print(f"Extra market cleansing faalde voor {fixture.matchup} / {extra_market}: {exc}")
 

@@ -1,0 +1,94 @@
+name: V25.1.4 Odds Integrity Hardening CI
+
+on:
+  push:
+    branches:
+      - dev/v25.1.4-odds-integrity-hardening
+    paths:
+      - .github/workflows/v25-odds-integrity-hardening-ci.yml
+      - football_agent/data/api_football.py
+      - football_agent/data/odds.py
+      - football_agent/models/market_model.py
+      - football_agent/models/value_engine.py
+      - football_agent/scripts/run_daily.py
+      - football_agent/schemas.py
+      - tests/test_market_model.py
+      - tests/test_value_engine.py
+      - tests/test_v25_1_1_odds_discovery.py
+      - requirements.txt
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/v25-odds-integrity-hardening-ci.yml
+      - football_agent/data/api_football.py
+      - football_agent/data/odds.py
+      - football_agent/models/market_model.py
+      - football_agent/models/value_engine.py
+      - football_agent/scripts/run_daily.py
+      - football_agent/schemas.py
+      - tests/test_market_model.py
+      - tests/test_value_engine.py
+      - tests/test_v25_1_1_odds_discovery.py
+      - requirements.txt
+
+concurrency:
+  group: v25-odds-integrity-hardening-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DATABASE_ENABLED: "false"
+      DATABASE_SHADOW_MODE: "true"
+      SUPABASE_URL: ""
+      SUPABASE_SECRET_KEY: ""
+      API_FOOTBALL_KEY: ""
+      FOOTBALL_DATA_API_KEY: ""
+      GEMINI_API_KEY: ""
+      TELEGRAM_ENABLED: "false"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPYCACHEPREFIX: "/tmp/v25-pycache"
+
+    steps:
+      - name: Checkout odds-integrity branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Confirm database and API isolation
+        run: |
+          test "$DATABASE_ENABLED" = "false"
+          test "$DATABASE_SHADOW_MODE" = "true"
+          test -z "$SUPABASE_URL"
+          test -z "$SUPABASE_SECRET_KEY"
+          test -z "$API_FOOTBALL_KEY"
+          test -z "$FOOTBALL_DATA_API_KEY"
+          test -z "$GEMINI_API_KEY"
+          test "$TELEGRAM_ENABLED" = "false"
+          echo "Database and external API isolation confirmed."
+
+      - name: Compile application and tests
+        run: python -m compileall -q football_agent tests
+
+      - name: Run smoke test
+        run: python smoke_test.py
+
+      - name: Run complete test suite
+        run: python -m unittest discover -s tests -v

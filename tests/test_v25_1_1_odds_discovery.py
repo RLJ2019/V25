@@ -90,5 +90,217 @@ class OddsDiscoveryTests(unittest.TestCase):
         self.assertEqual(selected_without, 1)
 
 
+    def test_only_full_match_btts_market_is_supported(self):
+        parser = ApiFootballClient(api_key="test")
+
+        self.assertEqual(
+            parser._parse_market_value("Both Teams Score", "Yes"),
+            ("BTTS", "BTTS_YES"),
+        )
+        self.assertEqual(
+            parser._parse_market_value("Both Teams Score", "No"),
+            ("BTTS", "BTTS_NO"),
+        )
+
+        unsupported_markets = (
+            "Both Teams Score - First Half",
+            "Both Teams To Score - Second Half",
+            "Both Teams To Score in Both Halves",
+        )
+
+        for bet_name in unsupported_markets:
+            with self.subTest(bet_name=bet_name, label="Yes"):
+                self.assertEqual(
+                    parser._parse_market_value(bet_name, "Yes"),
+                    (None, None),
+                )
+
+            with self.subTest(bet_name=bet_name, label="No"):
+                self.assertEqual(
+                    parser._parse_market_value(bet_name, "No"),
+                    (None, None),
+                )
+
+    def test_odds_response_excludes_non_full_match_btts_variants(self):
+        parser = ApiFootballClient(api_key="test")
+        data = {
+            "response": [
+                {
+                    "fixture": {"id": 1554386},
+                    "update": "2026-07-15T18:00:07+00:00",
+                    "bookmakers": [
+                        {
+                            "name": "Marathonbet",
+                            "bets": [
+                                {
+                                    "id": 8,
+                                    "name": "Both Teams Score",
+                                    "values": [
+                                        {"value": "Yes", "odd": "1.67"},
+                                        {"value": "No", "odd": "2.05"},
+                                    ],
+                                },
+                                {
+                                    "id": 34,
+                                    "name": "Both Teams Score - First Half",
+                                    "values": [
+                                        {"value": "Yes", "odd": "3.96"},
+                                        {"value": "No", "odd": "1.20"},
+                                    ],
+                                },
+                                {
+                                    "id": 35,
+                                    "name": "Both Teams To Score - Second Half",
+                                    "values": [
+                                        {"value": "Yes", "odd": "3.04"},
+                                        {"value": "No", "odd": "1.32"},
+                                    ],
+                                },
+                                {
+                                    "id": 113,
+                                    "name": "Both Teams To Score in Both Halves",
+                                    "values": [
+                                        {"value": "Yes", "odd": "11.00"},
+                                        {"value": "No", "odd": "1.00"},
+                                    ],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        parsed = parser.parse_odds_response(data)
+        snapshots = parsed[1554386]
+
+        self.assertEqual(len(snapshots), 2)
+        self.assertEqual(
+            [(row.market, row.selection, row.odds) for row in snapshots],
+            [
+                ("BTTS", "BTTS_YES", 1.67),
+                ("BTTS", "BTTS_NO", 2.05),
+            ],
+        )
+
+
+    def test_only_full_match_totals_market_is_supported(self):
+        parser = ApiFootballClient(api_key="test")
+
+        self.assertEqual(
+            parser._parse_market_value(
+                "Goals Over/Under",
+                "Over 2.5",
+            ),
+            ("OVER_UNDER_2_5", "OVER_2_5"),
+        )
+        self.assertEqual(
+            parser._parse_market_value(
+                "Goals Over/Under",
+                "Under 2.5",
+            ),
+            ("OVER_UNDER_2_5", "UNDER_2_5"),
+        )
+
+        unsupported_markets = (
+            "Goals Over/Under First Half",
+            "Goals Over/Under - Second Half",
+        )
+
+        for bet_name in unsupported_markets:
+            with self.subTest(bet_name=bet_name, label="Over 2.5"):
+                self.assertEqual(
+                    parser._parse_market_value(
+                        bet_name,
+                        "Over 2.5",
+                    ),
+                    (None, None),
+                )
+
+            with self.subTest(bet_name=bet_name, label="Under 2.5"):
+                self.assertEqual(
+                    parser._parse_market_value(
+                        bet_name,
+                        "Under 2.5",
+                    ),
+                    (None, None),
+                )
+
+    def test_odds_response_excludes_non_full_match_totals_variants(self):
+        parser = ApiFootballClient(api_key="test")
+        data = {
+            "response": [
+                {
+                    "fixture": {"id": 1554386},
+                    "update": "2026-07-15T18:00:07+00:00",
+                    "bookmakers": [
+                        {
+                            "name": "Marathonbet",
+                            "bets": [
+                                {
+                                    "id": 5,
+                                    "name": "Goals Over/Under",
+                                    "values": [
+                                        {
+                                            "value": "Over 2.5",
+                                            "odd": "1.90",
+                                        },
+                                        {
+                                            "value": "Under 2.5",
+                                            "odd": "1.90",
+                                        },
+                                    ],
+                                },
+                                {
+                                    "id": 6,
+                                    "name": "Goals Over/Under First Half",
+                                    "values": [
+                                        {
+                                            "value": "Over 2.5",
+                                            "odd": "7.50",
+                                        },
+                                        {
+                                            "value": "Under 2.5",
+                                            "odd": "1.05",
+                                        },
+                                    ],
+                                },
+                                {
+                                    "id": 26,
+                                    "name": "Goals Over/Under - Second Half",
+                                    "values": [
+                                        {
+                                            "value": "Over 2.5",
+                                            "odd": "4.50",
+                                        },
+                                        {
+                                            "value": "Under 2.5",
+                                            "odd": "1.18",
+                                        },
+                                    ],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        parsed = parser.parse_odds_response(data)
+        snapshots = parsed[1554386]
+
+        self.assertEqual(len(snapshots), 2)
+        self.assertEqual(
+            [
+                (row.market, row.selection, row.odds)
+                for row in snapshots
+            ],
+            [
+                ("OVER_UNDER_2_5", "OVER_2_5", 1.90),
+                ("OVER_UNDER_2_5", "UNDER_2_5", 1.90),
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -65,15 +65,45 @@ class ValueEngine:
         if odds is None:
             return self._no_odds_decision()
         model_prob = model_probs.get(odds.selection, 0.0)
-        market_prob = market_probs.get(odds.selection, 0.0)
+        baseline_source = (baseline_source_by_market or {}).get(odds.market, "unknown")
+        fair_odds = 1.0 / model_prob if model_prob > 0 else None
+
+        raw_market_prob = market_probs.get(odds.selection)
+        try:
+            market_prob = float(raw_market_prob)
+        except (TypeError, ValueError):
+            market_prob = 0.0
+
+        if odds.selection not in market_probs or not 0.0 < market_prob < 1.0:
+            return ValueDecision(
+                selection=odds.selection,
+                model_probability=model_prob,
+                market_probability=0.0,
+                odds=odds.odds,
+                edge=0.0,
+                fair_odds=fair_odds,
+                min_acceptable_odds=None,
+                status="NO_BET",
+                reason=(
+                    f"Marktprobability ontbreekt of is ongeldig voor "
+                    f"{odds.market}/{odds.selection}; fail-closed NO_BET."
+                ),
+                bookmaker=odds.bookmaker,
+                probability_edge=0.0,
+                expected_value=0.0,
+                market=odds.market,
+                baseline_source=baseline_source,
+                sharp_market_probability=0.0,
+                sharp_fair_odds=None,
+                selected_odds_profile=odds.profile or "unknown",
+            )
+
         probability_edge = model_prob - market_prob
         expected_value = (model_prob * odds.odds) - 1.0 if odds.odds else -1.0
-        fair_odds = 1.0 / model_prob if model_prob > 0 else None
         current_min_edge = self._threshold_for(odds, custom_min_edge, min_edge_by_market)
         min_acceptable_odds = ((1.0 + current_min_edge) / model_prob) if model_prob > 0 else None
         odds_above_value_floor = bool(min_acceptable_odds is not None and odds.odds >= min_acceptable_odds)
-        baseline_source = (baseline_source_by_market or {}).get(odds.market, "unknown")
-        market_fair_odds = (1.0 / market_prob) if market_prob > 0 else None
+        market_fair_odds = 1.0 / market_prob
 
         if expected_value >= current_min_edge and probability_edge >= self.min_probability_edge and odds_above_value_floor:
             status = "VALUE_CANDIDATE"
