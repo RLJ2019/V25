@@ -100,15 +100,15 @@ class ApiFootballClient:
         if bet_name in {"match winner", "1x2"}:
             market = "1X2"
             selection = "DRAW" if label in {"draw", "x"} else "HOME" if label in {"home", "1"} else "AWAY" if label in {"away", "2"} else None
-        elif "over/under" in bet_name or "goals over/under" in bet_name or bet_name in {"goals over/under"}:
-            # API-Football commonly labels values as "Over 2.5" / "Under 2.5".
+        elif bet_name in {"goals over/under", "over/under"}:
+            # Only the full-match totals market is supported.
             if "2.5" in label and "over" in label:
                 market = "OVER_UNDER_2_5"
                 selection = "OVER_2_5"
             elif "2.5" in label and "under" in label:
                 market = "OVER_UNDER_2_5"
                 selection = "UNDER_2_5"
-        elif "both teams" in bet_name or "both teams score" in bet_name:
+        elif bet_name in {"both teams score", "both teams to score"}:
             market = "BTTS"
             if label in {"yes", "y"}:
                 selection = "BTTS_YES"
