@@ -28,6 +28,24 @@ class MarketModel:
             raise ValueError("Overround is ongeldig.")
         return {k: v / total for k, v in raw.items()}
 
+    def no_vig_probabilities_for_selections(
+        self,
+        odds: Dict[str, float],
+        required_selections: set[str],
+    ) -> Dict[str, float]:
+        required = set(required_selections)
+        self._validate_odds_for_selections(odds, required)
+
+        raw = {
+            key: 1.0 / float(odds[key])
+            for key in sorted(required)
+        }
+        total = sum(raw.values())
+        if total <= 0:
+            raise ValueError("Overround is ongeldig.")
+
+        return {key: value / total for key, value in raw.items()}
+
     def fair_odds(self, odds: Dict[str, float]) -> Dict[str, float]:
         probs = self.no_vig_probabilities(odds)
         return {k: (1.0 / v if v > 0 else 999.0) for k, v in probs.items()}
@@ -49,6 +67,26 @@ class MarketModel:
 
     def edge(self, model_probability: float, market_probability: float) -> float:
         return model_probability - market_probability
+
+    def _validate_odds_for_selections(
+        self,
+        odds: Dict[str, float],
+        required_selections: set[str],
+    ) -> None:
+        if not required_selections:
+            raise ValueError("Vereiste marktselecties ontbreken.")
+
+        missing = required_selections.difference(odds.keys())
+        if missing:
+            raise ValueError(f"Ontbrekende marktodds: {sorted(missing)}")
+
+        unexpected = set(odds.keys()).difference(required_selections)
+        if unexpected:
+            raise ValueError(f"Onverwachte marktselecties: {sorted(unexpected)}")
+
+        for key in required_selections:
+            if float(odds[key]) <= 1.0:
+                raise ValueError(f"Odd voor {key} moet groter zijn dan 1.0")
 
     def _validate_odds(self, odds: Dict[str, float]) -> None:
         missing = self.REQUIRED.difference(odds.keys())

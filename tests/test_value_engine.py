@@ -32,5 +32,27 @@ class TestValueEngine(unittest.TestCase):
         self.assertEqual(d.status, 'NO_BET')
 
 
+    def test_missing_market_probability_fails_closed(self):
+        ev = ValueEngine(min_edge=0.04)
+        odds = OddsSnapshot(
+            "softbook",
+            "BTTS",
+            "BTTS_YES",
+            2.00,
+            "2026-01-01T00:00:00Z",
+        )
+
+        decision = ev.evaluate_selection_from_maps(
+            {"BTTS_YES": 0.62},
+            {},
+            odds,
+        )
+
+        self.assertEqual(decision.status, "NO_BET")
+        self.assertEqual(decision.expected_value, 0.0)
+        self.assertEqual(decision.probability_edge, 0.0)
+        self.assertIn("marktprobability", decision.reason.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
