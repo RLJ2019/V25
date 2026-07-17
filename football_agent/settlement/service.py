@@ -20,6 +20,18 @@ from football_agent.settlement.totals import settle_totals
 VALUE_PICK_STATUSES = {"VALUE_PICK", "VALUE", "ALERT"}
 SKIP_PICK_STATUSES = {"NO_BET", "WATCHLIST", "SKIPPED"}
 
+# Historical picks that cannot be settled reliably because their normalized
+# market lost the original API-Football submarket identity.
+QUARANTINED_CONTAMINATED_PICKS = {
+    "2ec0a3e5-6d06-54f7-8716-1107dff1e38d": {
+        "reason": "API_FOOTBALL_SUBMARKET_COLLISION",
+        "fixture_id": "af-1554386",
+        "market": "BTTS",
+        "selection": "BTTS_YES",
+        "entry_odds": "11.00",
+    },
+}
+
 
 class SettlementService:
     def __init__(self, repository: Any, result_provider: Any, *, dry_run: bool = True, now_utc: Optional[datetime] = None):
@@ -32,6 +44,13 @@ class SettlementService:
         pick_id = str(row.get("pick_id") or "")
         if not pick_id:
             return SettlementOutcome.skipped("SKIPPED_MISSING_PICK_ID")
+
+        quarantine = QUARANTINED_CONTAMINATED_PICKS.get(pick_id)
+        if quarantine:
+            return SettlementOutcome.skipped(
+                "SKIPPED_QUARANTINED_CONTAMINATED_PICK",
+                **quarantine,
+            )
 
         status = str(row.get("status") or "").upper()
         if status in SKIP_PICK_STATUSES or status not in VALUE_PICK_STATUSES:

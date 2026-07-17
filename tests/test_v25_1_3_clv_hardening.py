@@ -307,5 +307,130 @@ class V2513ClvHardeningTests(unittest.TestCase):
         )
 
 
+    def test_known_contaminated_pick_is_quarantined(self):
+        service = SettlementService(None, None, dry_run=True)
+
+        normalized = service._input_from_pick({
+            "pick_id": "2ec0a3e5-6d06-54f7-8716-1107dff1e38d",
+            "fixture_id": "af-1554386",
+            "status": "VALUE_PICK",
+            "market": "BTTS",
+            "selection": "BTTS_YES",
+            "stake_units": 1,
+            "entry_odds": 11.00,
+            "bookmaker": "marathonbet",
+        })
+
+        self.assertIsInstance(normalized, SettlementOutcome)
+        self.assertEqual(normalized.status, "SKIPPED")
+        self.assertEqual(
+            normalized.settlement_basis,
+            "SKIPPED_QUARANTINED_CONTAMINATED_PICK",
+        )
+        self.assertEqual(
+            normalized.details.get("reason"),
+            "API_FOOTBALL_SUBMARKET_COLLISION",
+        )
+
+    def test_other_btts_longshot_is_not_quarantined(self):
+        service = SettlementService(None, None, dry_run=True)
+
+        normalized = service._input_from_pick({
+            "pick_id": "11111111-2222-3333-4444-555555555555",
+            "fixture_id": "af-9999999",
+            "status": "VALUE_PICK",
+            "market": "BTTS",
+            "selection": "BTTS_YES",
+            "stake_units": 1,
+            "entry_odds": 11.00,
+            "bookmaker": "marathonbet",
+        })
+
+        self.assertIsInstance(normalized, SettlementInput)
+        self.assertEqual(normalized.entry_odds, Decimal("11.0"))
+
+
+    def test_quarantined_pick_never_reaches_write_path(self):
+        class FakeRepository:
+            def __init__(self):
+                self.fixture_reads = 0
+                self.closing_odds_reads = 0
+                self.upsert_calls = 0
+
+            def fetch_unsettled_value_picks(self, limit=1000):
+                return [
+                    {
+                        "pick_id": "2ec0a3e5-6d06-54f7-8716-1107dff1e38d",
+                        "fixture_id": "af-1554386",
+                        "status": "VALUE_PICK",
+                        "market": "BTTS",
+                        "selection": "BTTS_YES",
+                        "stake_units": 1,
+                        "entry_odds": 11.00,
+                        "bookmaker": "marathonbet",
+                    }
+                ]
+
+            def fetch_fixture_by_id(self, fixture_id):
+                self.fixture_reads += 1
+                return {
+                    "fixture_id": fixture_id,
+                    "kickoff_utc": "2026-07-15T19:00:00Z",
+                }
+
+            def fetch_closing_odds_bundle(self, *args, **kwargs):
+                self.closing_odds_reads += 1
+                raise AssertionError(
+                    "Quarantined pick reached closing-odds processing"
+                )
+
+            def upsert_settlements(self, rows):
+                self.upsert_calls += 1
+                raise AssertionError(
+                    "Quarantined pick reached settlement write path"
+                )
+
+        class FailResultProvider:
+            def __init__(self):
+                self.calls = 0
+
+            def get_fixture_result(self, *args, **kwargs):
+                self.calls += 1
+                raise AssertionError(
+                    "Quarantined pick reached result processing"
+                )
+
+        repository = FakeRepository()
+        result_provider = FailResultProvider()
+        service = SettlementService(
+            repository,
+            result_provider,
+            dry_run=False,
+        )
+
+        report = service.settle_once(limit=1)
+
+        self.assertEqual(report["candidate_picks"], 1)
+        self.assertEqual(report["writeable_settlements"], 0)
+        self.assertEqual(report["written_settlements"], 0)
+        self.assertEqual(report["skipped"], 1)
+        self.assertEqual(report["settlements"], [])
+
+        skipped = report["skipped_details"][0]
+        self.assertEqual(
+            skipped["basis"],
+            "SKIPPED_QUARANTINED_CONTAMINATED_PICK",
+        )
+        self.assertEqual(
+            skipped["details"]["reason"],
+            "API_FOOTBALL_SUBMARKET_COLLISION",
+        )
+
+        self.assertEqual(repository.fixture_reads, 1)
+        self.assertEqual(repository.closing_odds_reads, 0)
+        self.assertEqual(repository.upsert_calls, 0)
+        self.assertEqual(result_provider.calls, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
