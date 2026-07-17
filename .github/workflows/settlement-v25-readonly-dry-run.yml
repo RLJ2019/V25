@@ -1,0 +1,111 @@
+name: V25.1.3 Read-only Settlement Dry Run
+
+on:
+  push:
+    branches:
+      - dev/v25.1.3-settlement-pipeline
+      - dev/v25.1.3-settlement-pipeline-clean
+    paths:
+      - .github/workflows/settlement-v25-readonly-dry-run.yml
+      - football_agent/settlement/**
+      - football_agent/scripts/run_settlement.py
+      - football_agent/data/results.py
+      - football_agent/database/connection.py
+      - football_agent/database/repository.py
+      - tests/test_v25_1_3_clv_hardening.py
+      - tests/test_v25_1_3_settlement_pipeline.py
+      - requirements.txt
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_ENABLED: "true"
+      DATABASE_SHADOW_MODE: "true"
+      DATABASE_FAIL_OPEN: "false"
+      DATABASE_BACKEND: "supabase_rest"
+      DATABASE_TIMEOUT_SECONDS: "20"
+      DATABASE_MAX_RETRIES: "2"
+      DATABASE_BATCH_SIZE: "250"
+
+      SETTLEMENT_DRY_RUN: "true"
+      SETTLEMENT_LIMIT: "1"
+      POSTPONED_VOID_AFTER_HOURS: "36"
+      SUPPORTED_TOTAL_LINES_MODE: "WHOLE_AND_HALF_ONLY"
+
+      CLV_ALLOW_BENCHMARK_FALLBACK: "true"
+      CLV_BENCHMARK_BOOKMAKER_PRIORITY: "pinnacle,Pinnacle"
+      CLV_ALLOW_CONSENSUS_FALLBACK: "true"
+      CLV_MIN_COMPLETE_BOOKMAKERS_FOR_CONSENSUS: "2"
+
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+
+      TELEGRAM_ENABLED: "false"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout settlement branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Confirm dry-run protections
+        shell: bash
+        run: |
+          test "$DATABASE_ENABLED" = "true"
+          test "$DATABASE_SHADOW_MODE" = "true"
+          test "$DATABASE_FAIL_OPEN" = "false"
+          test "$SETTLEMENT_DRY_RUN" = "true"
+          test "$SETTLEMENT_LIMIT" = "1"
+          test "$TELEGRAM_ENABLED" = "false"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SECRET_KEY"
+          test -n "$API_FOOTBALL_KEY"
+          echo "Read-only settlement dry-run protections confirmed."
+
+      - name: Run settlement dry-run
+        run: |
+          python -m football_agent.scripts.run_settlement \
+            --mode dry_run \
+            --limit 1
+
+      - name: Show generated reports
+        if: always()
+        shell: bash
+        run: |
+          echo "===== OUTPUT FILES ====="
+          find output -maxdepth 1 -type f -print 2>/dev/null || true
+
+          echo
+          echo "===== JSON REPORTS ====="
+          for file in output/*.json; do
+            [[ -f "$file" ]] || continue
+            echo "--- $file ---"
+            cat "$file"
+            echo
+          done
+
+      - name: Upload dry-run reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v25-settlement-readonly-dry-run
+          path: output/
+          if-no-files-found: warn
+          retention-days: 7

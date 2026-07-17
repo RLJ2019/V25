@@ -300,3 +300,53 @@ class DatabaseRepository:
             columns="fixture_id,market,selection,status,signature,sent,last_action,last_updated_at",
             limit=limit,
         )
+
+    # V25.1.3 settlement pipeline read/write helpers. These are only used by
+    # football_agent.scripts.run_settlement and do not alter daily pick generation.
+    def fetch_unsettled_value_picks(self, limit: int = 1000) -> list[dict[str, Any]]:
+        existing = {str(row.get("pick_id")) for row in self.client.select("settlements", columns="pick_id", limit=10000)}
+        rows = self.client.select(
+            "picks",
+            columns=(
+                "pick_id,identity_key,fixture_id,competition_key,competition_name,market,selection,bookmaker,status,"
+                "entry_odds,model_probability,market_probability,stake_units,original_created_at,last_seen_at"
+            ),
+            filters={"status": "eq.VALUE_PICK"},
+            limit=limit,
+        )
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            if str(row.get("pick_id")) in existing:
+                continue
+            try:
+                if float(row.get("stake_units") or 0) <= 0:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            out.append(row)
+        return out
+
+    def fetch_fixture_by_id(self, fixture_id: str) -> dict[str, Any] | None:
+        rows = self.client.select(
+            "fixtures",
+            columns="fixture_id,api_football_fixture_id,competition_key,competition_name,home_team,away_team,kickoff_utc,status,source,home_score,away_score",
+            filters={"fixture_id": f"eq.{fixture_id}"},
+            limit=1,
+        )
+        return rows[0] if rows else None
+
+    def fetch_closing_odds_bundle(self, fixture_id: str, market: str, selection: str, *, line: Any = None, limit: int = 1000) -> list[dict[str, Any]]:
+        rows = self.client.select(
+            "odds_snapshots",
+            columns="snapshot_key,fixture_id,bookmaker,market,selection,odds,profile,snapshot_timestamp_utc,captured_at",
+            filters={"fixture_id": f"eq.{fixture_id}", "market": f"eq.{market}"},
+            limit=limit,
+        )
+        # PostgREST ordering is intentionally not required here; CLV selects complete
+        # bundles and the repository keeps enough rows for a fixture-level close.
+        return rows
+
+    def upsert_settlements(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        payload = [dict(row) for row in rows]
+        self.client.upsert("settlements", payload, on_conflict="pick_id")
+        return len(payload)
