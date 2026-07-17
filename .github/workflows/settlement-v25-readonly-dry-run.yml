@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev/v25.1.3-settlement-pipeline
+      - dev/v25.1.3-settlement-pipeline-clean
     paths:
       - .github/workflows/settlement-v25-readonly-dry-run.yml
       - football_agent/settlement/**

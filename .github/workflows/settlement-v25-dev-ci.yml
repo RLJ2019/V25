@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev/v25.1.3-settlement-pipeline
+      - dev/v25.1.3-settlement-pipeline-clean
 
 concurrency:
   group: v25-settlement-dev-ci-${{ github.ref }}
