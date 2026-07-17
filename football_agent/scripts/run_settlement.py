@@ -11,8 +11,24 @@ from football_agent.database.repository import DatabaseRepository
 from football_agent.settlement.service import SettlementService, write_settlement_outputs
 
 
+SETTLEMENT_WRITE_CONFIRMATION_VALUE = "I_UNDERSTAND_SETTLEMENT_WRITES"
+
+
 def env_bool(name: str, default: bool) -> bool:
     return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "ja", "on"}
+
+
+def require_settlement_write_confirmation(mode: str) -> None:
+    if mode != "settle":
+        return
+
+    confirmation = os.getenv("SETTLEMENT_WRITE_CONFIRMATION", "").strip()
+    if confirmation != SETTLEMENT_WRITE_CONFIRMATION_VALUE:
+        raise SystemExit(
+            "Settlement writes blocked: set "
+            "SETTLEMENT_WRITE_CONFIRMATION="
+            f"{SETTLEMENT_WRITE_CONFIRMATION_VALUE} to confirm write mode."
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,6 +40,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    require_settlement_write_confirmation(args.mode)
     settings = DatabaseSettings.from_env()
     client = SupabaseRestClient(settings)
 

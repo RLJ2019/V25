@@ -11,6 +11,10 @@ on:
         description: "max unsettled VALUE_PICK rows to inspect"
         required: false
         default: "1000"
+      write_confirmation:
+        description: "required for settle mode: I_UNDERSTAND_SETTLEMENT_WRITES"
+        required: false
+        default: ""
 
 concurrency:
   group: v25-settlement-pipeline
@@ -37,6 +41,7 @@ jobs:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
 
       SETTLEMENT_LIMIT: ${{ github.event.inputs.limit || '1000' }}
+      SETTLEMENT_WRITE_CONFIRMATION: ${{ github.event.inputs.write_confirmation || '' }}
       POSTPONED_VOID_AFTER_HOURS: ${{ vars.POSTPONED_VOID_AFTER_HOURS || '36' }}
       SUPPORTED_TOTAL_LINES_MODE: "WHOLE_AND_HALF_ONLY"
       CLV_ALLOW_BENCHMARK_FALLBACK: ${{ vars.CLV_ALLOW_BENCHMARK_FALLBACK || 'true' }}
