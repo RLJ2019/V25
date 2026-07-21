@@ -1301,6 +1301,50 @@ class V2515RunDailyInstrumentationTests(unittest.TestCase):
             shadow_finish_start,
         )
 
+    def test_disabled_discovery_still_emits_passive_metrics(self):
+        source = self._run_daily_source()
+
+        discovery_setup_start = source.index(
+            "    api_football = ApiFootballClient()"
+        )
+        service_start = source.index(
+            "    odds_discovery = OddsDiscoveryService(",
+            discovery_setup_start,
+        )
+        discover_start = source.index(
+            "    discovery_result = odds_discovery.discover(",
+            service_start,
+        )
+        metrics_start = source.index(
+            "    odds_metrics = discovery_result.metrics.as_dict()",
+            discover_start,
+        )
+        enabled_branch_start = source.index(
+            "    if odds_discovery_enabled:",
+            discovery_setup_start,
+        )
+
+        self.assertLess(service_start, enabled_branch_start)
+        self.assertLess(discover_start, enabled_branch_start)
+        self.assertLess(metrics_start, enabled_branch_start)
+
+        enabled_branch_end = source.index(
+            '    print(f"Wedstrijden geselecteerd voor analyse:',
+            enabled_branch_start,
+        )
+        enabled_branch = source[
+            enabled_branch_start:enabled_branch_end
+        ]
+
+        self.assertIn(
+            "OddsDiscoveryService.select_with_odds_priority(",
+            enabled_branch,
+        )
+        self.assertIn(
+            "fixtures = fixtures[:max_matches]",
+            enabled_branch,
+        )
+
     def test_operational_report_is_added_after_decision_and_exposure(self):
         source = self._run_daily_source()
 
