@@ -1212,10 +1212,14 @@ class V2516OperationalIntegrityReportTests(unittest.TestCase):
         )
 
 class V2515RunDailyInstrumentationTests(unittest.TestCase):
-    def test_run_daily_integrity_diagnostics_are_observation_only(self):
-        source = Path(
+    @staticmethod
+    def _run_daily_source():
+        return Path(
             "football_agent/scripts/run_daily.py"
         ).read_text(encoding="utf-8")
+
+    def test_run_daily_integrity_diagnostics_are_observation_only(self):
+        source = self._run_daily_source()
 
         self.assertIn(
             "IntegrityDiagnosticsMetrics",
@@ -1297,39 +1301,66 @@ class V2515RunDailyInstrumentationTests(unittest.TestCase):
             shadow_finish_start,
         )
 
-        diagnostics_summary_line = (
-            '    summary["integrity_diagnostics"] = '
-            'integrity_metrics.as_dict()'
-        )
+    def test_operational_report_is_added_after_decision_and_exposure(self):
+        source = self._run_daily_source()
+
         self.assertIn(
-            diagnostics_summary_line,
+            "build_operational_integrity_report",
             source,
         )
 
-        diagnostics_summary_start = source.index(
-            diagnostics_summary_line,
+        exposure_start = source.index(
+            "    picks = exposure.apply(picks)"
+        )
+        summary_start = source.index(
+            "    summary = summarize(picks)",
+            exposure_start,
+        )
+        diagnostics_start = source.index(
+            '    summary["integrity_diagnostics"] = '
+            'integrity_metrics.as_dict()',
             summary_start,
+        )
+        report_start = source.index(
+            '    summary["operational_integrity"] = (',
+            diagnostics_start,
         )
         daily_summary_write_start = source.index(
             '    (out_dir / "daily_summary.txt").write_text(',
-            diagnostics_summary_start,
+            report_start,
         )
         shadow_finish_start = source.index(
             "    shadow_db.finish(summary)",
-            diagnostics_summary_start,
+            report_start,
         )
 
-        self.assertLess(
-            summary_start,
-            diagnostics_summary_start,
+        decision_and_exposure_path = source[
+            exposure_start:summary_start
+        ]
+        self.assertNotIn(
+            "build_operational_integrity_report",
+            decision_and_exposure_path,
         )
-        self.assertLess(
-            diagnostics_summary_start,
-            daily_summary_write_start,
+
+        self.assertLess(summary_start, diagnostics_start)
+        self.assertLess(diagnostics_start, report_start)
+        self.assertLess(report_start, daily_summary_write_start)
+        self.assertLess(report_start, shadow_finish_start)
+
+        report_block = source[
+            report_start:daily_summary_write_start
+        ]
+        self.assertIn(
+            "summary=summary",
+            report_block,
         )
-        self.assertLess(
-            diagnostics_summary_start,
-            shadow_finish_start,
+        self.assertIn(
+            'integrity_diagnostics=summary["integrity_diagnostics"]',
+            report_block,
+        )
+        self.assertIn(
+            'odds_discovery=summary.get("odds_discovery", {})',
+            report_block,
         )
 
 if __name__ == "__main__":

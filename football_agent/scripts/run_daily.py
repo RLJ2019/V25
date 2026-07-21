@@ -22,6 +22,7 @@ from football_agent.storage.odds_timeline import OddsTimelineAnalyzer
 from football_agent.reports.telegram import TelegramReporter
 from football_agent.reports.daily_summary import (
     IntegrityDiagnosticsMetrics,
+    build_operational_integrity_report,
     summarize,
 )
 from football_agent.storage.model_versions import MODEL_VERSION
@@ -440,6 +441,13 @@ def main() -> None:
     if odds_metrics:
         summary["odds_discovery"] = odds_metrics
         shadow_db.update_odds_metrics(odds_metrics)
+    summary["operational_integrity"] = (
+        build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=summary["integrity_diagnostics"],
+            odds_discovery=summary.get("odds_discovery", {}),
+        )
+    )
     (out_dir / "daily_summary.txt").write_text(str(summary), encoding="utf-8")
     print("Samenvatting:", summary)
 
