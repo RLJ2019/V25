@@ -20,7 +20,10 @@ from football_agent.storage.odds_snapshots import OddsSnapshotStore
 from football_agent.storage.data_snapshots import DataSnapshotStore
 from football_agent.storage.odds_timeline import OddsTimelineAnalyzer
 from football_agent.reports.telegram import TelegramReporter
-from football_agent.reports.daily_summary import summarize
+from football_agent.reports.daily_summary import (
+    IntegrityDiagnosticsMetrics,
+    summarize,
+)
 from football_agent.storage.model_versions import MODEL_VERSION
 from football_agent.storage.notification_state import NotificationState
 from football_agent.reports.live_sheet_export import LiveSheetExporter
@@ -248,6 +251,7 @@ def main() -> None:
     )
     odds_timeline = OddsTimelineAnalyzer(max_age_minutes=max_odds_age_minutes)
     international_break_filter = InternationalBreakFilter(days_after=international_break_days_after)
+    integrity_metrics = IntegrityDiagnosticsMetrics()
 
     prediction_log = PredictionLog(out_dir / "prediction_log.csv")
     odds_store = OddsSnapshotStore(out_dir / "odds_snapshots.csv")
@@ -279,16 +283,26 @@ def main() -> None:
         shadow_observations.append((fixture, list(odds)))
         freshness = odds_timeline.freshness(odds)
         sharp_movement = odds_timeline.sharp_implied_movement(odds)
+        integrity_metrics.observe_fixture(
+            odds_count=len(odds),
+            odds_fresh=freshness.fresh,
+        )
 
         sharp_odds = market_odds_matrix(odds, profile="sharp", market="1X2")
         all_odds = market_odds_matrix(odds, market="1X2")
         one_x_two_has_sharp = all(k in sharp_odds for k in ["HOME", "DRAW", "AWAY"])
         odds_for_market = sharp_odds if one_x_two_has_sharp else all_odds
         baseline_source_by_market = {"1X2": "sharp" if one_x_two_has_sharp else "all_bookmakers"}
+        one_x_two_complete = all(
+            key in odds_for_market
+            for key in ["HOME", "DRAW", "AWAY"]
+        )
+        one_x_two_cleansing_succeeded = False
         market_cleansing_failed = False
-        if all(k in odds_for_market for k in ["HOME", "DRAW", "AWAY"]):
+        if one_x_two_complete:
             try:
                 market_probs = market.no_vig_probabilities(odds_for_market)
+                one_x_two_cleansing_succeeded = True
             except Exception as exc:
                 print(f"Market cleansing faalde voor {fixture.matchup}: {exc}")
                 market_probs = None
@@ -296,6 +310,15 @@ def main() -> None:
         else:
             market_probs = None
             market_cleansing_failed = bool(odds)
+
+        integrity_metrics.observe_market(
+            market="1X2",
+            available=bool(odds_for_market),
+            complete=one_x_two_complete,
+            cleansing_attempted=one_x_two_complete,
+            cleansing_succeeded=one_x_two_cleansing_succeeded,
+            baseline_source=baseline_source_by_market["1X2"],
+        )
 
         # Build value-market probabilities for 1X2 plus goal markets when odds exist.
         # The 1X2 market remains the anchor for the ensemble baseline; extra markets are
@@ -311,6 +334,8 @@ def main() -> None:
             has_sharp_extra = set(sharp_extra) == required_selections
             matrix = sharp_extra if has_sharp_extra else all_extra
             baseline_source_by_market[extra_market] = "sharp" if has_sharp_extra else "all_bookmakers"
+            extra_complete = set(matrix) == required_selections
+            extra_cleansing_succeeded = False
             if matrix:
                 try:
                     value_market_probs.update(
@@ -319,8 +344,21 @@ def main() -> None:
                             required_selections,
                         )
                     )
+                    extra_cleansing_succeeded = True
                 except Exception as exc:
                     print(f"Extra market cleansing faalde voor {fixture.matchup} / {extra_market}: {exc}")
+
+            integrity_metrics.observe_market(
+                market=extra_market,
+                available=bool(matrix),
+                complete=extra_complete,
+                cleansing_attempted=extra_complete,
+                cleansing_succeeded=(
+                    extra_complete
+                    and extra_cleansing_succeeded
+                ),
+                baseline_source=baseline_source_by_market[extra_market],
+            )
 
         comp = competition_by_key.get(fixture.competition_key)
         promoted_teams = comp.promoted_teams if comp else []
@@ -398,6 +436,7 @@ def main() -> None:
     prediction_log.append(picks)
     shadow_db.record_observations(shadow_observations, picks)
     summary = summarize(picks)
+    summary["integrity_diagnostics"] = integrity_metrics.as_dict()
     if odds_metrics:
         summary["odds_discovery"] = odds_metrics
         shadow_db.update_odds_metrics(odds_metrics)

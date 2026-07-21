@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from football_agent.decision.exposure_manager import ExposureManager
 from football_agent.decision.pick_selector import PickSelector
 from football_agent.data.odds import BookmakerProfiler, OddsDiscoveryService
-from football_agent.reports.daily_summary import summarize
+from football_agent.reports.daily_summary import (
+    IntegrityDiagnosticsMetrics,
+    summarize,
+)
 from football_agent.schemas import (
     Competition,
     FeatureAttribution,
@@ -630,6 +634,338 @@ class V2515OddsDiscoveryFailureDiagnosticsTests(unittest.TestCase):
         self.assertEqual(
             list(result.odds_by_api_fixture_id),
             [3001],
+        )
+
+
+class V2515MarketIntegrityDiagnosticsTests(unittest.TestCase):
+    def test_fixture_observation_counts_odds_and_freshness(self):
+        metrics = IntegrityDiagnosticsMetrics()
+
+        metrics.observe_fixture(
+            odds_count=7,
+            odds_fresh=True,
+        )
+        metrics.observe_fixture(
+            odds_count=0,
+            odds_fresh=False,
+        )
+
+        self.assertEqual(metrics.fixtures_analyzed, 2)
+        self.assertEqual(metrics.fixtures_with_any_odds, 1)
+        self.assertEqual(metrics.fixtures_without_any_odds, 1)
+        self.assertEqual(metrics.odds_rows_analyzed, 7)
+        self.assertEqual(metrics.odds_fresh, 1)
+        self.assertEqual(metrics.odds_not_fresh, 1)
+        self.assertEqual(
+            metrics.reason_counts,
+            {
+                "NO_ODDS_AVAILABLE": 1,
+                "ODDS_NOT_FRESH": 1,
+            },
+        )
+
+    def test_market_observation_counts_complete_incomplete_and_missing(self):
+        metrics = IntegrityDiagnosticsMetrics()
+
+        metrics.observe_market(
+            market="1X2",
+            available=True,
+            complete=True,
+            cleansing_attempted=True,
+            cleansing_succeeded=True,
+            baseline_source="sharp",
+        )
+        metrics.observe_market(
+            market="BTTS",
+            available=True,
+            complete=False,
+            cleansing_attempted=False,
+            cleansing_succeeded=False,
+            baseline_source="all_bookmakers",
+        )
+        metrics.observe_market(
+            market="OVER_UNDER_2_5",
+            available=False,
+            complete=False,
+            cleansing_attempted=False,
+            cleansing_succeeded=False,
+            baseline_source="all_bookmakers",
+        )
+
+        self.assertEqual(
+            metrics.market_available,
+            {
+                "1X2": 1,
+                "BTTS": 1,
+                "OVER_UNDER_2_5": 0,
+            },
+        )
+        self.assertEqual(
+            metrics.market_complete,
+            {
+                "1X2": 1,
+                "BTTS": 0,
+                "OVER_UNDER_2_5": 0,
+            },
+        )
+        self.assertEqual(
+            metrics.market_incomplete,
+            {
+                "1X2": 0,
+                "BTTS": 1,
+                "OVER_UNDER_2_5": 0,
+            },
+        )
+        self.assertEqual(
+            metrics.market_cleansing_success,
+            {
+                "1X2": 1,
+                "BTTS": 0,
+                "OVER_UNDER_2_5": 0,
+            },
+        )
+        self.assertEqual(
+            metrics.market_cleansing_failed,
+            {
+                "1X2": 0,
+                "BTTS": 0,
+                "OVER_UNDER_2_5": 0,
+            },
+        )
+        self.assertEqual(
+            metrics.baseline_source_counts,
+            {
+                "1X2": {
+                    "sharp": 1,
+                    "all_bookmakers": 0,
+                },
+                "BTTS": {
+                    "sharp": 0,
+                    "all_bookmakers": 1,
+                },
+                "OVER_UNDER_2_5": {
+                    "sharp": 0,
+                    "all_bookmakers": 0,
+                },
+            },
+        )
+        self.assertEqual(
+            metrics.reason_counts,
+            {
+                "BTTS_INCOMPLETE": 1,
+                "OVER_UNDER_2_5_NOT_AVAILABLE": 1,
+            },
+        )
+
+    def test_complete_market_cleansing_failure_is_reported_separately(self):
+        metrics = IntegrityDiagnosticsMetrics()
+
+        metrics.observe_market(
+            market="BTTS",
+            available=True,
+            complete=True,
+            cleansing_attempted=True,
+            cleansing_succeeded=False,
+            baseline_source="all_bookmakers",
+        )
+
+        self.assertEqual(metrics.market_available["BTTS"], 1)
+        self.assertEqual(metrics.market_complete["BTTS"], 1)
+        self.assertEqual(metrics.market_incomplete["BTTS"], 0)
+        self.assertEqual(metrics.market_cleansing_success["BTTS"], 0)
+        self.assertEqual(metrics.market_cleansing_failed["BTTS"], 1)
+        self.assertEqual(
+            metrics.reason_counts,
+            {"BTTS_CLEANSING_ERROR": 1},
+        )
+
+
+    def test_market_diagnostics_as_dict_is_detached_from_internal_state(self):
+        metrics = IntegrityDiagnosticsMetrics()
+
+        metrics.observe_fixture(
+            odds_count=3,
+            odds_fresh=True,
+        )
+        metrics.observe_market(
+            market="1X2",
+            available=True,
+            complete=True,
+            cleansing_attempted=True,
+            cleansing_succeeded=True,
+            baseline_source="sharp",
+        )
+
+        payload = metrics.as_dict()
+        payload["reason_counts"]["MUTATED_EXTERNALLY"] = 99
+        payload["market_available"]["1X2"] = 999
+
+        self.assertNotIn(
+            "MUTATED_EXTERNALLY",
+            metrics.reason_counts,
+        )
+        self.assertEqual(
+            metrics.market_available["1X2"],
+            1,
+        )
+
+    def test_diagnostics_do_not_mutate_pick_fingerprint(self):
+        selector = PickSelector(
+            no_bet_rules=_NoViolations(),
+            staking=_FixedStaking(),
+        )
+        selector.market_attributor = _FixedMarketAttributor()
+
+        pick = selector.select(
+            _analysis(
+                "fx-diagnostics-non-mutation",
+                home_team="PSV",
+                away_team="Ajax",
+            ),
+            _value(0.26),
+        )
+        before = _fingerprint(pick)
+
+        metrics = IntegrityDiagnosticsMetrics()
+        metrics.observe_fixture(
+            odds_count=3,
+            odds_fresh=True,
+        )
+        metrics.observe_market(
+            market="1X2",
+            available=True,
+            complete=True,
+            cleansing_attempted=True,
+            cleansing_succeeded=True,
+            baseline_source="sharp",
+        )
+        metrics.as_dict()
+
+        self.assertEqual(
+            _fingerprint(pick),
+            before,
+        )
+
+
+class V2515RunDailyInstrumentationTests(unittest.TestCase):
+    def test_run_daily_integrity_diagnostics_are_observation_only(self):
+        source = Path(
+            "football_agent/scripts/run_daily.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "IntegrityDiagnosticsMetrics",
+            source,
+        )
+        self.assertIn(
+            "integrity_metrics = IntegrityDiagnosticsMetrics()",
+            source,
+        )
+        self.assertEqual(
+            source.count("integrity_metrics.observe_fixture("),
+            1,
+        )
+        self.assertEqual(
+            source.count("integrity_metrics.observe_market("),
+            2,
+        )
+
+        analysis_start = source.index(
+            "        analysis = ensemble.analyze("
+        )
+        pick_start = source.index(
+            "        pick = selector.select(",
+            analysis_start,
+        )
+        decision_path = source[analysis_start:pick_start]
+
+        self.assertNotIn(
+            "integrity_metrics",
+            decision_path,
+        )
+
+        exposure_start = source.index(
+            "    picks = exposure.apply(picks)"
+        )
+        summary_start = source.index(
+            "    summary = summarize(picks)",
+            exposure_start,
+        )
+        portfolio_path = source[exposure_start:summary_start]
+
+        self.assertNotIn(
+            "integrity_metrics",
+            portfolio_path,
+        )
+
+        diagnostics_summary_line = (
+            '    summary["integrity_diagnostics"] = '
+            'integrity_metrics.as_dict()'
+        )
+        self.assertIn(
+            diagnostics_summary_line,
+            source,
+        )
+
+        diagnostics_summary_start = source.index(
+            diagnostics_summary_line,
+            summary_start,
+        )
+        daily_summary_write_start = source.index(
+            '    (out_dir / "daily_summary.txt").write_text(',
+            diagnostics_summary_start,
+        )
+        shadow_finish_start = source.index(
+            "    shadow_db.finish(summary)",
+            diagnostics_summary_start,
+        )
+
+        self.assertLess(
+            summary_start,
+            diagnostics_summary_start,
+        )
+        self.assertLess(
+            diagnostics_summary_start,
+            daily_summary_write_start,
+        )
+        self.assertLess(
+            diagnostics_summary_start,
+            shadow_finish_start,
+        )
+
+        diagnostics_summary_line = (
+            '    summary["integrity_diagnostics"] = '
+            'integrity_metrics.as_dict()'
+        )
+        self.assertIn(
+            diagnostics_summary_line,
+            source,
+        )
+
+        diagnostics_summary_start = source.index(
+            diagnostics_summary_line,
+            summary_start,
+        )
+        daily_summary_write_start = source.index(
+            '    (out_dir / "daily_summary.txt").write_text(',
+            diagnostics_summary_start,
+        )
+        shadow_finish_start = source.index(
+            "    shadow_db.finish(summary)",
+            diagnostics_summary_start,
+        )
+
+        self.assertLess(
+            summary_start,
+            diagnostics_summary_start,
+        )
+        self.assertLess(
+            diagnostics_summary_start,
+            daily_summary_write_start,
+        )
+        self.assertLess(
+            diagnostics_summary_start,
+            shadow_finish_start,
         )
 
 if __name__ == "__main__":
