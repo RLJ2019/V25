@@ -637,6 +637,188 @@ class V2515OddsDiscoveryFailureDiagnosticsTests(unittest.TestCase):
         )
 
 
+class _DisabledProviderClient:
+    enabled = False
+
+    def odds_bulk(self, **kwargs):
+        raise AssertionError(
+            "Uitgeschakelde provider mag niet worden aangeroepen."
+        )
+
+    def parse_odds_response(self, data):
+        raise AssertionError(
+            "Parser mag bij uitgeschakelde provider niet worden aangeroepen."
+        )
+
+
+class _PartialFailureBulkOddsClient:
+    enabled = True
+
+    def __init__(self):
+        self.calls = []
+
+    def odds_bulk(
+        self,
+        *,
+        league_id: int,
+        season: int,
+        odds_date=None,
+        page: int = 1,
+        **kwargs,
+    ):
+        self.calls.append((league_id, season, odds_date, page))
+        if page == 2:
+            raise RuntimeError("diagnostic failure on later page")
+
+        return {
+            "results": 1,
+            "paging": {"current": page, "total": 2},
+            "response": [
+                {"fixture": {"id": 6001}},
+            ],
+        }
+
+    def parse_odds_response(self, data):
+        return {
+            6001: [
+                OddsSnapshot(
+                    bookmaker="diagnostic",
+                    market="1X2",
+                    selection="HOME",
+                    odds=2.00,
+                    timestamp_utc="2026-07-21T08:00:00Z",
+                ),
+            ],
+        }
+
+
+class V2516OddsDiscoveryCoverageTests(unittest.TestCase):
+    @staticmethod
+    def _fixture_and_competition():
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        fixture = _discovery_fixture(
+            "coverage-6001",
+            api_fixture_id=6001,
+            competition_key="integrity",
+            kickoff_utc=(now + timedelta(days=1)).isoformat(),
+        )
+        competition = Competition(
+            key="integrity",
+            name="Integrity League",
+            country="Test",
+            type="league",
+            football_data_code=None,
+            api_football_league_id=999,
+        )
+        return fixture, competition
+
+    def test_discovery_disabled_reports_reason_without_provider_calls(self):
+        fixture, competition = self._fixture_and_competition()
+        client = _ZeroResultsBulkOddsClient()
+
+        result = OddsDiscoveryService(
+            client,
+            BookmakerProfiler(profiles={}),
+            enabled=False,
+            bulk_enabled=True,
+        ).discover(
+            [fixture],
+            {"integrity": competition},
+            season=2026,
+        )
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(result.odds_by_api_fixture_id, {})
+        self.assertEqual(
+            result.metrics.reason_counts,
+            {"ODDS_DISCOVERY_DISABLED": 1},
+        )
+
+    def test_bulk_disabled_reports_reason_without_provider_calls(self):
+        fixture, competition = self._fixture_and_competition()
+        client = _ZeroResultsBulkOddsClient()
+
+        result = OddsDiscoveryService(
+            client,
+            BookmakerProfiler(profiles={}),
+            enabled=True,
+            bulk_enabled=False,
+        ).discover(
+            [fixture],
+            {"integrity": competition},
+            season=2026,
+        )
+
+        self.assertEqual(client.calls, [])
+        self.assertEqual(result.odds_by_api_fixture_id, {})
+        self.assertEqual(
+            result.metrics.reason_counts,
+            {"ODDS_DISCOVERY_BULK_DISABLED": 1},
+        )
+
+    def test_provider_disabled_reports_reason_without_requests(self):
+        fixture, competition = self._fixture_and_competition()
+
+        result = OddsDiscoveryService(
+            _DisabledProviderClient(),
+            BookmakerProfiler(profiles={}),
+            enabled=True,
+            bulk_enabled=True,
+        ).discover(
+            [fixture],
+            {"integrity": competition},
+            season=2026,
+        )
+
+        self.assertEqual(result.metrics.odds_requests, 0)
+        self.assertEqual(result.odds_by_api_fixture_id, {})
+        self.assertEqual(
+            result.metrics.reason_counts,
+            {"ODDS_PROVIDER_DISABLED": 1},
+        )
+
+    def test_later_page_failure_preserves_earlier_discovered_rows(self):
+        fixture, competition = self._fixture_and_competition()
+        client = _PartialFailureBulkOddsClient()
+
+        result = OddsDiscoveryService(
+            client,
+            BookmakerProfiler(
+                profiles={"diagnostic": {"profile": "unknown"}}
+            ),
+            enabled=True,
+            bulk_enabled=True,
+            discovery_window_days=14,
+            max_pages_per_query=5,
+            max_requests=10,
+        ).discover(
+            [fixture],
+            {"integrity": competition},
+            season=2026,
+        )
+
+        self.assertEqual(
+            client.calls,
+            [
+                (999, 2026, None, 1),
+                (999, 2026, None, 2),
+            ],
+        )
+        self.assertEqual(result.metrics.odds_requests, 2)
+        self.assertEqual(result.metrics.odds_pages_fetched, 1)
+        self.assertEqual(result.metrics.odds_provider_errors, 1)
+        self.assertEqual(result.metrics.fixtures_with_odds, 1)
+        self.assertEqual(result.metrics.fixtures_without_odds, 0)
+        self.assertEqual(result.metrics.odds_rows_discovered, 1)
+        self.assertEqual(
+            result.metrics.reason_counts,
+            {"ODDS_PROVIDER_REQUEST_ERROR": 1},
+        )
+        self.assertEqual(
+            list(result.odds_by_api_fixture_id),
+            [6001],
+        )
+
 class V2515MarketIntegrityDiagnosticsTests(unittest.TestCase):
     def test_fixture_observation_counts_odds_and_freshness(self):
         metrics = IntegrityDiagnosticsMetrics()
