@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -43,8 +43,17 @@ class OddsDiscoveryMetrics:
     max_requests: int = 80
     fixtures_scanned_total: int = 0
     fixtures_considered_for_odds: int = 0
+
+    # V25.1.4-compatible aggregate counters.
     fixtures_skipped_no_api_id: int = 0
     fixtures_skipped_outside_window: int = 0
+
+    # V25.1.5 passive diagnostic split counters.
+    fixtures_skipped_missing_fixture_api_id: int = 0
+    fixtures_skipped_invalid_kickoff: int = 0
+    fixtures_skipped_future_window: int = 0
+    fixtures_skipped_missing_league_api_id: int = 0
+
     bulk_queries: int = 0
     odds_requests: int = 0
     odds_pages_fetched: int = 0
@@ -57,6 +66,17 @@ class OddsDiscoveryMetrics:
     selected_with_odds: int = 0
     selected_without_odds: int = 0
     request_limit_reached: bool = False
+
+    provider_fixtures_returned: int = 0
+    provider_fixtures_ignored_not_considered: int = 0
+    odds_rows_ignored_not_considered: int = 0
+    pagination_queries_truncated: int = 0
+    reason_counts: Dict[str, int] = field(default_factory=dict)
+
+    def record_reason(self, code: str, count: int = 1) -> None:
+        if count <= 0:
+            return
+        self.reason_counts[code] = self.reason_counts.get(code, 0) + int(count)
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -153,12 +173,15 @@ class OddsDiscoveryService:
         odds_by_api_fixture_id: Dict[int, List[OddsSnapshot]] = {}
 
         if not self.enabled:
+            metrics.record_reason("ODDS_DISCOVERY_DISABLED")
             print("Odds discovery overgeslagen: ODDS_DISCOVERY_ENABLED=false")
             return BulkOddsDiscoveryResult(odds_by_api_fixture_id, metrics)
         if not self.bulk_enabled:
+            metrics.record_reason("ODDS_DISCOVERY_BULK_DISABLED")
             print("Odds discovery bulk overgeslagen: ODDS_DISCOVERY_BULK_ENABLED=false")
             return BulkOddsDiscoveryResult(odds_by_api_fixture_id, metrics)
         if not getattr(self.api_football, "enabled", False):
+            metrics.record_reason("ODDS_PROVIDER_DISABLED")
             print("Odds discovery overgeslagen: API-Football client disabled")
             return BulkOddsDiscoveryResult(odds_by_api_fixture_id, metrics)
 
@@ -171,21 +194,33 @@ class OddsDiscoveryService:
             api_id = fixture.api_football_fixture_id
             if not api_id:
                 metrics.fixtures_skipped_no_api_id += 1
+                metrics.fixtures_skipped_missing_fixture_api_id += 1
+                metrics.record_reason("MISSING_FIXTURE_API_ID")
                 continue
+
             kickoff_date = _parse_iso_date(fixture.kickoff_utc)
             if kickoff_date is None:
                 metrics.fixtures_skipped_outside_window += 1
+                metrics.fixtures_skipped_invalid_kickoff += 1
+                metrics.record_reason("INVALID_KICKOFF_UTC")
                 continue
+
             # Future odds are usually not available far ahead. Historical/test fixtures are
             # still allowed because they may have stored historical odds.
             if kickoff_date > max_future_date:
                 metrics.fixtures_skipped_outside_window += 1
+                metrics.fixtures_skipped_future_window += 1
+                metrics.record_reason("OUTSIDE_DISCOVERY_WINDOW")
                 continue
+
             comp = competitions_by_key.get(fixture.competition_key)
             league_id = comp.api_football_league_id if comp else None
             if not league_id:
                 metrics.fixtures_skipped_no_api_id += 1
+                metrics.fixtures_skipped_missing_league_api_id += 1
+                metrics.record_reason("MISSING_LEAGUE_API_ID")
                 continue
+
             grouped[int(league_id)].append(fixture)
             considered_api_ids.add(int(api_id))
 
@@ -205,12 +240,15 @@ class OddsDiscoveryService:
         for league_id in sorted(grouped.keys()):
             if metrics.odds_requests >= self.max_requests:
                 metrics.request_limit_reached = True
+                metrics.record_reason("ODDS_REQUEST_LIMIT_REACHED")
                 print("Odds discovery request-limit bereikt; resterende league queries overgeslagen.")
                 break
             page = 1
             total_pages = 1
             while page <= total_pages and page <= self.max_pages_per_query:
                 if metrics.odds_requests >= self.max_requests:
+                    if not metrics.request_limit_reached:
+                        metrics.record_reason("ODDS_REQUEST_LIMIT_REACHED")
                     metrics.request_limit_reached = True
                     print("Odds discovery request-limit bereikt tijdens pagination.")
                     break
@@ -219,6 +257,7 @@ class OddsDiscoveryService:
                     data = self.api_football.odds_bulk(league_id=league_id, season=season, page=page)
                     metrics.odds_pages_fetched += 1
                     response = data.get("response", []) or []
+                    metrics.provider_fixtures_returned += len(response)
                     results = int(data.get("results") or len(response) or 0)
                     paging = data.get("paging") or {}
                     try:
@@ -227,6 +266,7 @@ class OddsDiscoveryService:
                         total_pages = 1
                     if results == 0 or not response:
                         metrics.odds_results_zero += 1
+                        metrics.record_reason("ODDS_PROVIDER_ZERO_RESULTS")
                     print(
                         "Bulk odds request: league={league} season={season} "
                         "page={page} results={results} total_pages={total}".format(
@@ -240,18 +280,39 @@ class OddsDiscoveryService:
                     parsed = self.api_football.parse_odds_response(data)
                     for api_fixture_id, snapshots in parsed.items():
                         if api_fixture_id not in considered_api_ids:
+                            metrics.provider_fixtures_ignored_not_considered += 1
+                            metrics.odds_rows_ignored_not_considered += len(snapshots)
                             continue
                         enriched = self.profiler.enrich(snapshots)
                         odds_by_api_fixture_id.setdefault(api_fixture_id, []).extend(enriched)
                     page += 1
                 except Exception as exc:
                     metrics.odds_provider_errors += 1
+                    metrics.record_reason("ODDS_PROVIDER_REQUEST_ERROR")
                     print(f"Bulk odds ophalen faalde: league={league_id} season={season} page={page}: {exc}")
                     break
 
-        metrics.fixtures_with_odds = sum(1 for api_id in considered_api_ids if odds_by_api_fixture_id.get(api_id))
-        metrics.fixtures_without_odds = max(0, metrics.fixtures_considered_for_odds - metrics.fixtures_with_odds)
-        metrics.odds_rows_discovered = sum(len(rows) for rows in odds_by_api_fixture_id.values())
+            if page <= total_pages and page > self.max_pages_per_query:
+                metrics.pagination_queries_truncated += 1
+                metrics.record_reason("ODDS_PAGINATION_TRUNCATED")
+
+        metrics.fixtures_with_odds = sum(
+            1
+            for api_id in considered_api_ids
+            if odds_by_api_fixture_id.get(api_id)
+        )
+        metrics.fixtures_without_odds = max(
+            0,
+            metrics.fixtures_considered_for_odds - metrics.fixtures_with_odds,
+        )
+        metrics.record_reason(
+            "NO_DISCOVERED_ODDS_FOR_FIXTURE",
+            metrics.fixtures_without_odds,
+        )
+        metrics.odds_rows_discovered = sum(
+            len(rows)
+            for rows in odds_by_api_fixture_id.values()
+        )
         print(
             "Odds discovery result: fixtures_with_odds={with_odds} fixtures_without_odds={without_odds} "
             "odds_rows_discovered={rows} zero_result_requests={zero} provider_errors={errors}".format(
