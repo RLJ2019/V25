@@ -10,6 +10,7 @@ from football_agent.decision.pick_selector import PickSelector
 from football_agent.data.odds import BookmakerProfiler, OddsDiscoveryService
 from football_agent.reports.daily_summary import (
     IntegrityDiagnosticsMetrics,
+    build_operational_integrity_report,
     summarize,
 )
 from football_agent.schemas import (
@@ -1027,6 +1028,188 @@ class V2515MarketIntegrityDiagnosticsTests(unittest.TestCase):
             before,
         )
 
+
+class V2516OperationalIntegrityReportTests(unittest.TestCase):
+    @staticmethod
+    def _healthy_inputs():
+        summary = {
+            "scanned": 5,
+            "value_picks": 0,
+            "watchlist": 2,
+            "no_bet": 3,
+        }
+        integrity = {
+            "fixtures_analyzed": 5,
+            "fixtures_with_any_odds": 5,
+            "fixtures_without_any_odds": 0,
+            "odds_rows_analyzed": 403,
+            "odds_fresh": 5,
+            "odds_not_fresh": 0,
+            "market_available": {
+                "1X2": 5,
+                "BTTS": 5,
+                "OVER_UNDER_2_5": 5,
+            },
+            "market_complete": {
+                "1X2": 5,
+                "BTTS": 5,
+                "OVER_UNDER_2_5": 5,
+            },
+            "market_incomplete": {
+                "1X2": 0,
+                "BTTS": 0,
+                "OVER_UNDER_2_5": 0,
+            },
+            "market_cleansing_success": {
+                "1X2": 5,
+                "BTTS": 5,
+                "OVER_UNDER_2_5": 5,
+            },
+            "market_cleansing_failed": {
+                "1X2": 0,
+                "BTTS": 0,
+                "OVER_UNDER_2_5": 0,
+            },
+            "baseline_source_counts": {
+                "1X2": {"sharp": 5, "all_bookmakers": 0},
+                "BTTS": {"sharp": 5, "all_bookmakers": 0},
+                "OVER_UNDER_2_5": {
+                    "sharp": 5,
+                    "all_bookmakers": 0,
+                },
+            },
+            "reason_counts": {},
+        }
+        discovery = {
+            "enabled": True,
+            "bulk_enabled": True,
+            "fixtures_scanned_total": 250,
+            "fixtures_considered_for_odds": 147,
+            "fixtures_with_odds": 42,
+            "fixtures_without_odds": 105,
+            "odds_rows_discovered": 3316,
+            "odds_rows_written": 403,
+            "odds_provider_errors": 0,
+            "selected_with_odds": 5,
+            "selected_without_odds": 0,
+            "request_limit_reached": False,
+            "pagination_queries_truncated": 0,
+            "reason_counts": {
+                "OUTSIDE_DISCOVERY_WINDOW": 31,
+                "MISSING_FIXTURE_API_ID": 72,
+                "NO_DISCOVERED_ODDS_FOR_FIXTURE": 105,
+            },
+        }
+        return summary, integrity, discovery
+
+    def test_healthy_report_is_compact_and_preserves_input(self):
+        summary, integrity, discovery = self._healthy_inputs()
+        original_summary = dict(summary)
+
+        report = build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=integrity,
+            odds_discovery=discovery,
+        )
+
+        self.assertEqual(report["status"], "HEALTHY")
+        self.assertEqual(report["picks"], original_summary)
+        self.assertEqual(report["fixtures"]["analyzed"], 5)
+        self.assertEqual(report["fixtures"]["selected_with_odds"], 5)
+        self.assertEqual(report["fixtures"]["selected_without_odds"], 0)
+        self.assertEqual(report["markets"]["incomplete_total"], 0)
+        self.assertEqual(report["markets"]["cleansing_failed_total"], 0)
+        self.assertEqual(report["alerts"], [])
+        self.assertEqual(summary, original_summary)
+
+    def test_expected_discovery_gaps_do_not_create_false_alarm(self):
+        summary, integrity, discovery = self._healthy_inputs()
+
+        report = build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=integrity,
+            odds_discovery=discovery,
+        )
+
+        self.assertEqual(report["status"], "HEALTHY")
+        self.assertEqual(
+            report["reason_counts"]["odds_discovery"],
+            {
+                "OUTSIDE_DISCOVERY_WINDOW": 31,
+                "MISSING_FIXTURE_API_ID": 72,
+                "NO_DISCOVERED_ODDS_FOR_FIXTURE": 105,
+            },
+        )
+
+    def test_fallback_or_incomplete_market_is_observe(self):
+        summary, integrity, discovery = self._healthy_inputs()
+        integrity["market_incomplete"]["BTTS"] = 1
+        integrity["baseline_source_counts"]["BTTS"] = {
+            "sharp": 4,
+            "all_bookmakers": 1,
+        }
+        integrity["reason_counts"] = {"BTTS_INCOMPLETE": 1}
+
+        report = build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=integrity,
+            odds_discovery=discovery,
+        )
+
+        self.assertEqual(report["status"], "OBSERVE")
+        self.assertIn("INCOMPLETE_MARKETS", report["alerts"])
+        self.assertIn("ALL_BOOKMAKERS_FALLBACK_USED", report["alerts"])
+
+    def test_active_integrity_failure_is_investigate(self):
+        summary, integrity, discovery = self._healthy_inputs()
+        integrity["odds_not_fresh"] = 1
+        integrity["market_cleansing_failed"]["1X2"] = 1
+        discovery["odds_provider_errors"] = 1
+        discovery["selected_without_odds"] = 1
+        discovery["request_limit_reached"] = True
+        discovery["pagination_queries_truncated"] = 1
+
+        report = build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=integrity,
+            odds_discovery=discovery,
+        )
+
+        self.assertEqual(report["status"], "INVESTIGATE")
+        self.assertIn("STALE_ODDS", report["alerts"])
+        self.assertIn("MARKET_CLEANSING_FAILURE", report["alerts"])
+        self.assertIn("ODDS_PROVIDER_ERROR", report["alerts"])
+        self.assertIn("SELECTED_WITHOUT_ODDS", report["alerts"])
+        self.assertIn("ODDS_REQUEST_LIMIT_REACHED", report["alerts"])
+        self.assertIn("ODDS_PAGINATION_TRUNCATED", report["alerts"])
+
+    def test_disabled_discovery_is_visible_without_changing_pick_summary(self):
+        summary, integrity, _ = self._healthy_inputs()
+        discovery = {
+            "enabled": False,
+            "bulk_enabled": False,
+            "reason_counts": {
+                "ODDS_DISCOVERY_DISABLED": 1,
+            },
+        }
+
+        report = build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=integrity,
+            odds_discovery=discovery,
+        )
+
+        self.assertEqual(report["status"], "OBSERVE")
+        self.assertIn("ODDS_DISCOVERY_DISABLED", report["alerts"])
+        self.assertEqual(
+            report["picks"],
+            {
+                "scanned": 5,
+                "value_picks": 0,
+                "watchlist": 2,
+                "no_bet": 3,
+            },
+        )
 
 class V2515RunDailyInstrumentationTests(unittest.TestCase):
     def test_run_daily_integrity_diagnostics_are_observation_only(self):
