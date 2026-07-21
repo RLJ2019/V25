@@ -636,7 +636,6 @@ class V2515OddsDiscoveryFailureDiagnosticsTests(unittest.TestCase):
             [3001],
         )
 
-
 class _DisabledProviderClient:
     enabled = False
 
