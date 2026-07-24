@@ -22,6 +22,7 @@ from football_agent.storage.odds_timeline import OddsTimelineAnalyzer
 from football_agent.reports.telegram import TelegramReporter
 from football_agent.reports.daily_summary import (
     IntegrityDiagnosticsMetrics,
+    build_operational_integrity_report,
     summarize,
 )
 from football_agent.storage.model_versions import MODEL_VERSION
@@ -177,29 +178,40 @@ def main() -> None:
 
     api_football = ApiFootballClient()
     profiler = BookmakerProfiler()
-    odds_by_api_fixture_id = {}
-    odds_metrics = {}
+    odds_discovery = OddsDiscoveryService(
+        api_football,
+        profiler,
+        enabled=odds_discovery_enabled,
+        bulk_enabled=odds_discovery_bulk_enabled,
+        discovery_window_days=odds_discovery_days,
+        max_pages_per_query=odds_discovery_max_pages,
+        max_requests=odds_discovery_max_requests,
+    )
+    discovery_result = odds_discovery.discover(
+        fixtures,
+        competition_by_key,
+        season=fixture_season,
+    )
+    odds_by_api_fixture_id = discovery_result.odds_by_api_fixture_id
+    odds_metrics = discovery_result.metrics.as_dict()
+
     if odds_discovery_enabled:
-        odds_discovery = OddsDiscoveryService(
-            api_football,
-            profiler,
-            enabled=odds_discovery_enabled,
-            bulk_enabled=odds_discovery_bulk_enabled,
-            discovery_window_days=odds_discovery_days,
-            max_pages_per_query=odds_discovery_max_pages,
-            max_requests=odds_discovery_max_requests,
-        )
-        discovery_result = odds_discovery.discover(fixtures, competition_by_key, season=fixture_season)
-        odds_by_api_fixture_id = discovery_result.odds_by_api_fixture_id
-        fixtures, selected_with_odds, selected_without_odds = OddsDiscoveryService.select_with_odds_priority(
-            fixtures, odds_by_api_fixture_id, max_matches=max_matches
+        fixtures, selected_with_odds, selected_without_odds = (
+            OddsDiscoveryService.select_with_odds_priority(
+                fixtures,
+                odds_by_api_fixture_id,
+                max_matches=max_matches,
+            )
         )
         discovery_result.metrics.selected_with_odds = selected_with_odds
         discovery_result.metrics.selected_without_odds = selected_without_odds
         odds_metrics = discovery_result.metrics.as_dict()
     else:
         fixtures = fixtures[:max_matches]
-        print(f"Odds discovery uitgeschakeld; eerste {len(fixtures)} fixtures geselecteerd.")
+        print(
+            f"Odds discovery uitgeschakeld; eerste {len(fixtures)} "
+            "fixtures geselecteerd."
+        )
 
     print(f"Wedstrijden geselecteerd voor analyse: {len(fixtures)}")
 
@@ -440,6 +452,13 @@ def main() -> None:
     if odds_metrics:
         summary["odds_discovery"] = odds_metrics
         shadow_db.update_odds_metrics(odds_metrics)
+    summary["operational_integrity"] = (
+        build_operational_integrity_report(
+            summary=summary,
+            integrity_diagnostics=summary["integrity_diagnostics"],
+            odds_discovery=summary.get("odds_discovery", {}),
+        )
+    )
     (out_dir / "daily_summary.txt").write_text(str(summary), encoding="utf-8")
     print("Samenvatting:", summary)
 

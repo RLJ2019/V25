@@ -151,6 +151,207 @@ class IntegrityDiagnosticsMetrics:
         return asdict(self)
 
 
+def _diagnostic_int(
+    values: Dict[str, object],
+    key: str,
+) -> int:
+    try:
+        return int(values.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def build_operational_integrity_report(
+    *,
+    summary: Dict[str, object],
+    integrity_diagnostics: Dict[str, object],
+    odds_discovery: Dict[str, object],
+) -> Dict[str, object]:
+    """Build a compact, passive operational view of existing metrics.
+
+    The report only reads values already produced by the daily pipeline. It
+    does not alter picks, probabilities, staking, exposure, notifications, or
+    settlement behaviour.
+    """
+
+    picks = {
+        key: _diagnostic_int(summary, key)
+        for key in (
+            "scanned",
+            "value_picks",
+            "watchlist",
+            "no_bet",
+        )
+    }
+
+    market_incomplete = integrity_diagnostics.get(
+        "market_incomplete",
+        {},
+    )
+    if not isinstance(market_incomplete, dict):
+        market_incomplete = {}
+
+    market_cleansing_failed = integrity_diagnostics.get(
+        "market_cleansing_failed",
+        {},
+    )
+    if not isinstance(market_cleansing_failed, dict):
+        market_cleansing_failed = {}
+
+    baseline_source_counts = integrity_diagnostics.get(
+        "baseline_source_counts",
+        {},
+    )
+    if not isinstance(baseline_source_counts, dict):
+        baseline_source_counts = {}
+
+    incomplete_total = sum(
+        _diagnostic_int(market_incomplete, market)
+        for market in market_incomplete
+    )
+    cleansing_failed_total = sum(
+        _diagnostic_int(market_cleansing_failed, market)
+        for market in market_cleansing_failed
+    )
+
+    all_bookmakers_fallback_total = 0
+    for source_counts in baseline_source_counts.values():
+        if isinstance(source_counts, dict):
+            all_bookmakers_fallback_total += _diagnostic_int(
+                source_counts,
+                "all_bookmakers",
+            )
+
+    integrity_reasons = integrity_diagnostics.get(
+        "reason_counts",
+        {},
+    )
+    if not isinstance(integrity_reasons, dict):
+        integrity_reasons = {}
+
+    discovery_reasons = odds_discovery.get(
+        "reason_counts",
+        {},
+    )
+    if not isinstance(discovery_reasons, dict):
+        discovery_reasons = {}
+
+    alerts = []
+
+    if _diagnostic_int(integrity_diagnostics, "odds_not_fresh"):
+        alerts.append("STALE_ODDS")
+
+    if cleansing_failed_total:
+        alerts.append("MARKET_CLEANSING_FAILURE")
+
+    if _diagnostic_int(odds_discovery, "odds_provider_errors"):
+        alerts.append("ODDS_PROVIDER_ERROR")
+
+    if _diagnostic_int(odds_discovery, "selected_without_odds"):
+        alerts.append("SELECTED_WITHOUT_ODDS")
+
+    if bool(odds_discovery.get("request_limit_reached", False)):
+        alerts.append("ODDS_REQUEST_LIMIT_REACHED")
+
+    if _diagnostic_int(
+        odds_discovery,
+        "pagination_queries_truncated",
+    ):
+        alerts.append("ODDS_PAGINATION_TRUNCATED")
+
+    investigate_alerts = set(alerts)
+
+    if incomplete_total:
+        alerts.append("INCOMPLETE_MARKETS")
+
+    if all_bookmakers_fallback_total:
+        alerts.append("ALL_BOOKMAKERS_FALLBACK_USED")
+
+    if odds_discovery and odds_discovery.get("enabled") is False:
+        alerts.append("ODDS_DISCOVERY_DISABLED")
+
+    if odds_discovery and odds_discovery.get("bulk_enabled") is False:
+        alerts.append("ODDS_DISCOVERY_BULK_DISABLED")
+
+    if _diagnostic_int(discovery_reasons, "ODDS_PROVIDER_DISABLED"):
+        alerts.append("ODDS_PROVIDER_DISABLED")
+
+    if investigate_alerts:
+        status = "INVESTIGATE"
+    elif alerts:
+        status = "OBSERVE"
+    else:
+        status = "HEALTHY"
+
+    return {
+        "status": status,
+        "picks": picks,
+        "fixtures": {
+            "scanned_total": _diagnostic_int(
+                odds_discovery,
+                "fixtures_scanned_total",
+            ),
+            "considered_for_odds": _diagnostic_int(
+                odds_discovery,
+                "fixtures_considered_for_odds",
+            ),
+            "with_odds": _diagnostic_int(
+                odds_discovery,
+                "fixtures_with_odds",
+            ),
+            "without_odds": _diagnostic_int(
+                odds_discovery,
+                "fixtures_without_odds",
+            ),
+            "analyzed": _diagnostic_int(
+                integrity_diagnostics,
+                "fixtures_analyzed",
+            ),
+            "selected_with_odds": _diagnostic_int(
+                odds_discovery,
+                "selected_with_odds",
+            ),
+            "selected_without_odds": _diagnostic_int(
+                odds_discovery,
+                "selected_without_odds",
+            ),
+        },
+        "odds": {
+            "rows_discovered": _diagnostic_int(
+                odds_discovery,
+                "odds_rows_discovered",
+            ),
+            "rows_written": _diagnostic_int(
+                odds_discovery,
+                "odds_rows_written",
+            ),
+            "rows_analyzed": _diagnostic_int(
+                integrity_diagnostics,
+                "odds_rows_analyzed",
+            ),
+            "fresh": _diagnostic_int(
+                integrity_diagnostics,
+                "odds_fresh",
+            ),
+            "not_fresh": _diagnostic_int(
+                integrity_diagnostics,
+                "odds_not_fresh",
+            ),
+        },
+        "markets": {
+            "incomplete_total": incomplete_total,
+            "cleansing_failed_total": cleansing_failed_total,
+            "all_bookmakers_fallback_total": (
+                all_bookmakers_fallback_total
+            ),
+        },
+        "alerts": alerts,
+        "reason_counts": {
+            "integrity": dict(integrity_reasons),
+            "odds_discovery": dict(discovery_reasons),
+        },
+    }
+
 def summarize(picks: Iterable[PickDecision]) -> Dict:
     picks = list(picks)
     c = Counter(p.status for p in picks)

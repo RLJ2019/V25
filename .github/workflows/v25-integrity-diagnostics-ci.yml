@@ -1,40 +1,46 @@
-name: V25.1.4 Odds Integrity Hardening CI
+name: V25 Integrity Diagnostics CI
 
 on:
   push:
     branches:
-      - dev/v25.1.4-odds-integrity-hardening
+      - dev/v25.1.6-operational-diagnostics
     paths:
-      - .github/workflows/v25-odds-integrity-hardening-ci.yml
+      - .github/workflows/v25-integrity-diagnostics-ci.yml
       - football_agent/data/api_football.py
       - football_agent/data/odds.py
       - football_agent/models/market_model.py
       - football_agent/models/value_engine.py
+      - football_agent/reports/daily_summary.py
       - football_agent/scripts/run_daily.py
       - football_agent/schemas.py
       - tests/test_market_model.py
       - tests/test_value_engine.py
       - tests/test_v25_1_1_odds_discovery.py
+      - tests/test_v25_1_5_integrity_diagnostics.py
+      - docs/integrity-diagnostics.md
       - requirements.txt
 
   pull_request:
     branches:
       - main
     paths:
-      - .github/workflows/v25-odds-integrity-hardening-ci.yml
+      - .github/workflows/v25-integrity-diagnostics-ci.yml
       - football_agent/data/api_football.py
       - football_agent/data/odds.py
       - football_agent/models/market_model.py
       - football_agent/models/value_engine.py
+      - football_agent/reports/daily_summary.py
       - football_agent/scripts/run_daily.py
       - football_agent/schemas.py
       - tests/test_market_model.py
       - tests/test_value_engine.py
       - tests/test_v25_1_1_odds_discovery.py
+      - tests/test_v25_1_5_integrity_diagnostics.py
+      - docs/integrity-diagnostics.md
       - requirements.txt
 
 concurrency:
-  group: v25-odds-integrity-hardening-${{ github.workflow }}-${{ github.ref }}
+  group: v25-integrity-diagnostics-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -58,7 +64,7 @@ jobs:
       PYTHONPYCACHEPREFIX: "/tmp/v25-pycache"
 
     steps:
-      - name: Checkout odds-integrity branch
+      - name: Checkout diagnostics branch
         uses: actions/checkout@v4
 
       - name: Set up Python
